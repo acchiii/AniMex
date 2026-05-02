@@ -4,8 +4,8 @@
 
 @push('styles')
 <style>
-  :root { --h-start: #f9fafb; --h-mid: rgba(249,250,251,0.85); --h-top: rgba(249,250,251,0.35); }
-  .dark { --h-start: #0a0a0f; --h-mid: rgba(10,10,15,0.85); --h-top: rgba(10,10,15,0.35); }
+  :root { --h-start: #f9fafb; --h-mid: rgba(249,250,251,0.7); --h-top: rgba(249,250,251,0.25); }
+  .dark { --h-start: #0a0a0f; --h-mid: rgba(10,10,15,0.7); --h-top: rgba(10,10,15,0.25); }
   .hero-overlay { background: linear-gradient(to top, var(--h-start) 0%, var(--h-mid) 40%, var(--h-top) 70%, transparent 100%); }
   .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

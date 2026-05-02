@@ -61,7 +61,7 @@ class AnimeController extends Controller
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortOrder = $request->get('order', 'desc');
-        $allowedSorts = ['title', 'aired_year', 'rating', 'views', 'created_at'];
+        $allowedSorts = ['title', 'aired_year', 'rating', 'views_count', 'created_at'];
         
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
@@ -104,7 +104,7 @@ class AnimeController extends Controller
         }
 
         // Increment views
-        $anime->increment('views');
+        $anime->increment('views_count');
 
         return view('anime.show', compact('anime', 'related', 'userRating', 'isFavorite', 'userWatchProgress'));
     }

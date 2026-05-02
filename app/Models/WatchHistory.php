@@ -10,6 +10,8 @@ class WatchHistory extends Model
 {
     use HasFactory;
 
+    protected $table = 'watch_history';
+
     protected $fillable = [
         'user_id',
         'anime_id',
