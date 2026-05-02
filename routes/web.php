@@ -50,4 +50,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/anime/{anime}/episodes', [AdminAnimeController::class, 'storeEpisode'])->name('anime.episodes.store');
     Route::put('/anime/{anime}/episodes/{episode}', [AdminAnimeController::class, 'updateEpisode'])->name('anime.episodes.update');
     Route::delete('/anime/{anime}/episodes/{episode}', [AdminAnimeController::class, 'destroyEpisode'])->name('anime.episodes.destroy');
+
+    Route::get('/import', [\App\Http\Controllers\Admin\AdminJikanController::class, 'search'])->name('import.search');
+    Route::post('/import/{malId}', [\App\Http\Controllers\Admin\AdminJikanController::class, 'import'])->name('import.anime');
 });

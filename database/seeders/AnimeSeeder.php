@@ -9,6 +9,7 @@ use App\Models\Genre;
 use App\Models\Studio;
 use App\Models\Tag;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 
 class AnimeSeeder extends Seeder
 {
@@ -19,7 +20,50 @@ class AnimeSeeder extends Seeder
 
     private function cover(string $seed): string
     {
-        return 'https://picsum.photos/seed/' . $seed . '/400/600';
+        $images = [
+            'aot-final' => 'https://cdn.myanimelist.net/images/anime/1948/120625.jpg',
+            'jjk-s2' => 'https://cdn.myanimelist.net/images/anime/1792/138022.jpg',
+            'demon-slayer' => 'https://cdn.myanimelist.net/images/anime/1286/99889.jpg',
+            'solo-leveling' => 'https://cdn.myanimelist.net/images/anime/1818/142492.jpg',
+            'frieren' => 'https://cdn.myanimelist.net/images/anime/1015/138006.jpg',
+            'spy-family' => 'https://cdn.myanimelist.net/images/anime/1441/138018.jpg',
+            'chainsaw-man' => 'https://cdn.myanimelist.net/images/anime/1806/126216.jpg',
+            'mha-s7' => 'https://cdn.myanimelist.net/images/anime/1811/142888.jpg',
+            'violet-evergarden' => 'https://cdn.myanimelist.net/images/anime/1795/95088.jpg',
+            'one-piece' => 'https://cdn.myanimelist.net/images/anime/1244/138851.jpg',
+            'death-note' => 'https://cdn.myanimelist.net/images/anime/1079/138100.jpg',
+            'naruto-shippuden' => 'https://cdn.myanimelist.net/images/anime/1565/111305.jpg',
+            'haikyuu' => 'https://cdn.myanimelist.net/images/anime/7/76014.jpg',
+            'spirited-away' => 'https://cdn.myanimelist.net/images/anime/6/79597.jpg',
+            'mob-psycho' => 'https://cdn.myanimelist.net/images/anime/8/80356.jpg',
+            'bocchi-rock' => 'https://cdn.myanimelist.net/images/anime/1448/127956.jpg',
+            'kaguya-sama' => 'https://cdn.myanimelist.net/images/anime/1295/106551.jpg',
+            'mushoku-tensei' => 'https://cdn.myanimelist.net/images/anime/1530/117776.jpg',
+            'vinland-saga' => 'https://cdn.myanimelist.net/images/anime/1500/103005.jpg',
+            'dr-stone' => 'https://cdn.myanimelist.net/images/anime/1613/138180.jpg',
+            'steins-gate' => 'https://cdn.myanimelist.net/images/anime/1935/127974.jpg',
+            'fmab' => 'https://cdn.myanimelist.net/images/anime/1223/96541.jpg',
+            'code-geass' => 'https://cdn.myanimelist.net/images/anime/1032/135088.jpg',
+            'cowboy-bebop' => 'https://cdn.myanimelist.net/images/anime/4/19644.jpg',
+            'evangelion' => 'https://cdn.myanimelist.net/images/anime/1314/108941.jpg',
+            'tokyo-ghoul' => 'https://cdn.myanimelist.net/images/anime/5/64449.jpg',
+            'your-name' => 'https://cdn.myanimelist.net/images/anime/5/87048.jpg',
+            'rezero' => 'https://cdn.myanimelist.net/images/anime/1522/128039.jpg',
+            'hxh' => 'https://cdn.myanimelist.net/images/anime/1337/99013.jpg',
+            'bleach-tybw' => 'https://cdn.myanimelist.net/images/anime/1908/135431.jpg',
+            'aot-s1' => 'https://cdn.myanimelist.net/images/anime/10/47347.jpg',
+            'sao' => 'https://cdn.myanimelist.net/images/anime/11/39797.jpg',
+            'opm' => 'https://cdn.myanimelist.net/images/anime/12/76049.jpg',
+            'toradora' => 'https://cdn.myanimelist.net/images/anime/13/22128.jpg',
+            'jojo' => 'https://cdn.myanimelist.net/images/anime/1286/138142.jpg',
+            'made-in-abyss' => 'https://cdn.myanimelist.net/images/anime/6/86733.jpg',
+            'promised-neverland' => 'https://cdn.myanimelist.net/images/anime/1830/118780.jpg',
+            'food-wars' => 'https://cdn.myanimelist.net/images/anime/1324/126249.jpg',
+            'weathering-with-you' => 'https://cdn.myanimelist.net/images/anime/1880/101146.jpg',
+            'dandadan' => 'https://cdn.myanimelist.net/images/anime/1833/143460.jpg',
+        ];
+
+        return $images[$seed] ?? 'https://cdn.myanimelist.net/images/anime/1948/120625.jpg';
     }
 
     public function run(): void
@@ -821,5 +865,13 @@ class AnimeSeeder extends Seeder
                 ]);
             }
         }
+
+        // Clear all homepage caches
+        Cache::forget('hero_anime');
+        Cache::forget('hero_anime_fallback');
+        Cache::forget('trending_anime');
+        Cache::forget('top_rated_anime');
+        Cache::forget('genre_sections');
+        Cache::forget('upcoming_anime');
     }
 }
