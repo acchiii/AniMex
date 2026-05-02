@@ -1,11 +1,11 @@
-<footer class="bg-gray-900 border-t border-gray-800 py-8">
+<footer class="bg-white dark:bg-[#0a0a0f] border-t border-gray-200 dark:border-gray-800/60 py-8 transition-colors duration-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p class="text-gray-400 text-sm">&copy; <?php echo e(date('Y')); ?> AniMex. All rights reserved.</p>
-<div class="flex items-center gap-6">
-                <a href="<?php echo e(route('home')); ?>" class="text-gray-400 hover:text-white text-sm">Terms</a>
-                <a href="<?php echo e(route('home')); ?>" class="text-gray-400 hover:text-white text-sm">Privacy</a>
-                <a href="mailto:contact@animex.com" class="text-gray-400 hover:text-white text-sm">Contact</a>
+            <p class="text-sm text-gray-500 dark:text-gray-500">&copy; <?php echo e(date('Y')); ?> AniMex. All rights reserved.</p>
+            <div class="flex items-center gap-6">
+                <a href="<?php echo e(route('home')); ?>" class="text-sm text-gray-500 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 transition">Terms</a>
+                <a href="<?php echo e(route('home')); ?>" class="text-sm text-gray-500 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 transition">Privacy</a>
+                <a href="mailto:contact@animex.com" class="text-sm text-gray-500 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 transition">Contact</a>
             </div>
         </div>
     </div>

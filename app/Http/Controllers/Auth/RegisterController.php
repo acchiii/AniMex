@@ -32,6 +32,10 @@ class RegisterController extends Controller
 
         Auth::login($user);
         
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Account created successfully.']);
+        }
+        
         return redirect()->route('home')->with('success', 'Account created successfully! Welcome to AniMex.');
     }
 }

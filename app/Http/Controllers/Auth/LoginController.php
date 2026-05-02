@@ -26,6 +26,9 @@ class LoginController extends Controller
         
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Too many login attempts. Try again in ' . ceil($seconds/60) . ' minutes.'], 429);
+            }
             return back()->with('error', 'Too many login attempts. Please try again in ' . ceil($seconds/60) . ' minutes.');
         }
 
@@ -33,10 +36,17 @@ class LoginController extends Controller
             RateLimiter::clear($key);
             $request->session()->regenerate();
             
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Logged in successfully.']);
+            }
             return redirect()->intended(route('home'))->with('success', 'Welcome back!');
         }
 
         RateLimiter::hit($key, 60);
+
+        if ($request->expectsJson()) {
+            return response()->json(['error' => 'The provided credentials do not match our records.', 'message' => 'Invalid credentials'], 422);
+        }
         
         throw ValidationException::withMessages([
             'email' => ['The provided credentials do not match our records.'],

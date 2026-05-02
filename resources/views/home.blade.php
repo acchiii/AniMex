@@ -4,61 +4,65 @@
 
 @push('styles')
 <style>
-.hero-gradient { background: linear-gradient(to top, #030712 0%, rgba(3,7,18,0.8) 30%, rgba(3,7,18,0.4) 60%, transparent 100%); }
+  :root { --h-start: #f9fafb; --h-mid: rgba(249,250,251,0.85); --h-top: rgba(249,250,251,0.35); }
+  .dark { --h-start: #0a0a0f; --h-mid: rgba(10,10,15,0.85); --h-top: rgba(10,10,15,0.35); }
+  .hero-overlay { background: linear-gradient(to top, var(--h-start) 0%, var(--h-mid) 40%, var(--h-top) 70%, transparent 100%); }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 @endpush
 
 {{-- Hero Section --}}
 <div class="relative h-[70vh] overflow-hidden">
     <div class="absolute inset-0" id="hero-bg"></div>
-    <div class="absolute inset-0 hero-gradient"></div>
+    <div class="absolute inset-0 hero-overlay"></div>
     <div class="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-end pb-20">
         <div class="max-w-2xl" id="hero-content">
             @if($heroAnime->isNotEmpty())
-                <h1 class="text-4xl md:text-5xl font-bold mb-4 text-white">{{ $heroAnime->first()->title_english ?? $heroAnime->first()->title }}</h1>
-                <p class="text-gray-300 mb-6 line-clamp-3">{{ $heroAnime->first()->synopsis }}</p>
-                <div class="flex items-center gap-4">
-                    <a href="{{ url('/anime/' . $heroAnime->first()->slug) }}" class="hero-watch bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-medium transition flex items-center gap-2">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 text-gray-900 dark:text-white leading-tight">{{ $heroAnime->first()->title_english ?? $heroAnime->first()->title }}</h1>
+                <p class="text-gray-600 dark:text-gray-400 mb-6 line-clamp-3 text-sm leading-relaxed">{{ $heroAnime->first()->synopsis }}</p>
+                <div class="flex items-center gap-3">
+                    <a href="{{ url('/anime/' . $heroAnime->first()->slug) }}" class="hero-watch bg-purple-600 hover:bg-purple-700 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition flex items-center gap-2 shadow-sm shadow-purple-600/25">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
                         Watch Now
                     </a>
-                    <a href="{{ url('/anime/' . $heroAnime->first()->slug) }}" class="hero-details bg-gray-800 hover:bg-gray-700 px-6 py-3 rounded-lg font-medium transition">Details</a>
+                    <a href="{{ url('/anime/' . $heroAnime->first()->slug) }}" class="hero-details bg-gray-200/80 dark:bg-white/10 hover:bg-gray-300/80 dark:hover:bg-white/15 text-gray-900 dark:text-white px-5 py-2.5 rounded-lg text-sm font-medium transition">Details</a>
                 </div>
             @endif
         </div>
     </div>
     @if($heroAnime->count() > 1)
-    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2" id="hero-dots">
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5" id="hero-dots">
         @foreach($heroAnime as $i => $a)
-            <button onclick="setHeroSlide({{ $i }})" class="hero-dot w-2 h-2 rounded-full transition {{ $i === 0 ? 'bg-purple-500 w-6' : 'bg-white/40' }}"></button>
+            <button onclick="setHeroSlide({{ $i }})" class="hero-dot w-1.5 h-1.5 rounded-full transition-all {{ $i === 0 ? 'bg-purple-500 w-5' : 'bg-gray-400/60 dark:bg-white/30 hover:bg-gray-400 dark:hover:bg-white/50' }}"></button>
         @endforeach
     </div>
     @endif
 </div>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
 
     @if($trending->isNotEmpty())
-    {{-- Trending --}}
     <section>
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold">🔥 Trending</h2>
-            <a href="{{ route('anime.popular') }}" class="text-purple-400 hover:text-purple-300 text-sm">View All →</a>
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Trending</h2>
+            <a href="{{ route('anime.popular') }}" class="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition">View All &rarr;</a>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             @foreach($trending->take(10) as $anime)
                 <a href="{{ url('/anime/' . $anime->slug) }}" class="group">
-                    <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-800">
+                    <div class="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-sm dark:shadow-none ring-1 ring-gray-200/60 dark:ring-gray-700/40 group-hover:ring-purple-400/50 dark:group-hover:ring-purple-500/50 transition">
                         @if($anime->cover_image)
-                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" loading="lazy">
                         @else
-                            <div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
+                            <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600 text-4xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
                         @endif
                         @if($anime->is_trending)
-                            <span class="absolute top-2 left-2 bg-purple-600 text-white text-xs px-2 py-1 rounded font-medium">#{{ $loop->iteration }}</span>
+                            <span class="absolute top-2 left-2 bg-purple-600/90 backdrop-blur-sm text-white text-[11px] px-2 py-0.5 rounded-md font-semibold">#{{ $loop->iteration }}</span>
                         @endif
+                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 pt-12">
+                            <h3 class="text-sm font-medium text-white truncate">{{ $anime->title_english ?? $anime->title }}</h3>
+                        </div>
                     </div>
-                    <h3 class="mt-2 text-sm font-medium text-white group-hover:text-purple-400 truncate">{{ $anime->title_english ?? $anime->title }}</h3>
                 </a>
             @endforeach
         </div>
@@ -66,21 +70,24 @@
     @endif
 
     @if($topRated->isNotEmpty())
-    {{-- Top Rated --}}
     <section>
-        <h2 class="text-2xl font-bold mb-4">⭐ Top Rated</h2>
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Top Rated</h2>
+        </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             @foreach($topRated->take(10) as $anime)
                 <a href="{{ url('/anime/' . $anime->slug) }}" class="group">
-                    <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-800">
+                    <div class="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-sm dark:shadow-none ring-1 ring-gray-200/60 dark:ring-gray-700/40 group-hover:ring-purple-400/50 dark:group-hover:ring-purple-500/50 transition">
                         @if($anime->cover_image)
-                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" loading="lazy">
                         @else
-                            <div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
+                            <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600 text-4xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
                         @endif
-                        <span class="absolute top-2 right-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded font-bold">{{ number_format($anime->score, 1) }}</span>
+                        <span class="absolute top-2 right-2 bg-amber-400/90 backdrop-blur-sm text-amber-900 text-[11px] px-1.5 py-0.5 rounded-md font-semibold">{{ number_format($anime->score, 1) }}</span>
+                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 pt-12">
+                            <h3 class="text-sm font-medium text-white truncate">{{ $anime->title_english ?? $anime->title }}</h3>
+                        </div>
                     </div>
-                    <h3 class="mt-2 text-sm font-medium text-white group-hover:text-purple-400 truncate">{{ $anime->title_english ?? $anime->title }}</h3>
                 </a>
             @endforeach
         </div>
@@ -88,25 +95,26 @@
     @endif
 
     @if($genreSections)
-    {{-- Genre Sections --}}
     @foreach($genreSections as $genreName => $genreAnime)
         @if($genreAnime->isNotEmpty())
         <section>
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-bold">{{ $genreName }}</h2>
-                <a href="{{ route('anime.genre', $genreName) }}" class="text-purple-400 hover:text-purple-300 text-sm">View All →</a>
+            <div class="flex items-center justify-between mb-5">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ $genreName }}</h2>
+                <a href="{{ route('anime.genre', $genreName) }}" class="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition">View All &rarr;</a>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 @foreach($genreAnime as $anime)
                     <a href="{{ url('/anime/' . $anime->slug) }}" class="group">
-                        <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-800">
+                        <div class="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-sm dark:shadow-none ring-1 ring-gray-200/60 dark:ring-gray-700/40 group-hover:ring-purple-400/50 dark:group-hover:ring-purple-500/50 transition">
                             @if($anime->cover_image)
-                                <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                                <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" loading="lazy">
                             @else
-                                <div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
+                                <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600 text-4xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
                             @endif
+                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 pt-12">
+                                <h3 class="text-sm font-medium text-white truncate">{{ $anime->title_english ?? $anime->title }}</h3>
+                            </div>
                         </div>
-                        <h3 class="mt-2 text-sm font-medium text-white group-hover:text-purple-400 truncate">{{ $anime->title_english ?? $anime->title }}</h3>
                     </a>
                 @endforeach
             </div>
@@ -116,21 +124,24 @@
     @endif
 
     @if($upcoming->isNotEmpty())
-    {{-- Upcoming --}}
     <section>
-        <h2 class="text-2xl font-bold mb-4">📅 Upcoming</h2>
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Upcoming</h2>
+        </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             @foreach($upcoming as $anime)
                 <a href="{{ url('/anime/' . $anime->slug) }}" class="group">
-                    <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-800">
+                    <div class="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-sm dark:shadow-none ring-1 ring-gray-200/60 dark:ring-gray-700/40 group-hover:ring-purple-400/50 dark:group-hover:ring-purple-500/50 transition">
                         @if($anime->cover_image)
-                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                            <img src="{{ str_starts_with($anime->cover_image, 'http') ? $anime->cover_image : asset('storage/' . $anime->cover_image) }}" alt="{{ $anime->title }}" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" loading="lazy">
                         @else
-                            <div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
+                            <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600 text-4xl font-bold">{{ substr($anime->title, 0, 1) }}</div>
                         @endif
-                        <span class="absolute top-2 left-2 bg-yellow-600 text-white text-xs px-2 py-1 rounded">Upcoming</span>
+                        <span class="absolute top-2 left-2 bg-emerald-500/90 backdrop-blur-sm text-white text-[11px] px-2 py-0.5 rounded-md font-semibold">Upcoming</span>
+                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3 pt-12">
+                            <h3 class="text-sm font-medium text-white truncate">{{ $anime->title_english ?? $anime->title }}</h3>
+                        </div>
                     </div>
-                    <h3 class="mt-2 text-sm font-medium text-white group-hover:text-purple-400 truncate">{{ $anime->title_english ?? $anime->title }}</h3>
                 </a>
             @endforeach
         </div>
@@ -154,18 +165,18 @@ function setHeroSlide(index) {
 
     if (bg) {
         const imgUrl = item.cover_image?.startsWith('http') ? item.cover_image : `/storage/${item.cover_image}`;
-        bg.style.transition = 'opacity 0.8s';
+        bg.style.transition = 'opacity 0.6s';
         bg.style.opacity = '0';
         setTimeout(() => {
             bg.style.backgroundImage = `url(${imgUrl})`;
             bg.style.backgroundSize = 'cover';
             bg.style.backgroundPosition = 'center';
             bg.style.opacity = '1';
-        }, 400);
+        }, 300);
     }
 
     if (content) {
-        content.style.transition = 'opacity 0.8s';
+        content.style.transition = 'opacity 0.6s';
         content.style.opacity = '0';
         setTimeout(() => {
             const watchBtn = content.querySelector('.hero-watch');
@@ -175,24 +186,20 @@ function setHeroSlide(index) {
             if (watchBtn) watchBtn.href = `/anime/${item.slug}`;
             if (detailsBtn) detailsBtn.href = `/anime/${item.slug}`;
             content.style.opacity = '1';
-        }, 400);
+        }, 300);
     }
 
     dots.forEach((dot, i) => {
-        dot.className = i === index ? 'hero-dot w-2 h-2 rounded-full transition bg-purple-500 w-6' : 'hero-dot w-2 h-2 rounded-full transition bg-white/40';
+        dot.className = i === index
+            ? 'hero-dot w-1.5 h-1.5 rounded-full transition-all bg-purple-500 w-5'
+            : 'hero-dot w-1.5 h-1.5 rounded-full transition-all bg-gray-400/60 dark:bg-white/30 hover:bg-gray-400 dark:hover:bg-white/50';
     });
 
     resetInterval();
 }
 
-function nextSlide() {
-    setHeroSlide((currentSlide + 1) % heroData.length);
-}
-
-function resetInterval() {
-    clearInterval(heroInterval);
-    heroInterval = setInterval(nextSlide, 5000);
-}
+function nextSlide() { setHeroSlide((currentSlide + 1) % heroData.length); }
+function resetInterval() { clearInterval(heroInterval); heroInterval = setInterval(nextSlide, 5000); }
 
 if (heroData.length > 0) {
     const bg = document.getElementById('hero-bg');
