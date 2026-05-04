@@ -16,16 +16,4 @@ export default defineConfig({
             '@': '/resources/js',
         },
     },
-    build: {
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    'vendor': ['alpinejs'],
-                    'player': ['hls.js', 'plyr'],
-                    'swiper': ['swiper'],
-                },
-            },
-        },
-        chunkSizeWarningLimit: 1000,
-    },
 });

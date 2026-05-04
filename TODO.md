@@ -1,12 +1,10 @@
-# TODO - Fix Broken Features/Buttons
+# Tailwind CDN to Vite Migration - COMPLETE ✅
 
-## Completed Issues:
-- [ ] 1. Fix routes/web.php - add missing routes (anime/{slug}, genre/{slug}, schedule, popular, etc.)
-- [ ] 2. Fix dead links in header.blade.php - update navigation links
-- [ ] 3. Fix dead links in welcome.blade.php - update buttons
-- [ ] 4. Implement LoginController - add create() and store() methods
-- [ ] 5. Implement RegisterController - add create() and store() methods
-- [ ] 6. Create auth login view template
-- [ ] 7. Create auth register view template
-- [ ] 8. Create anime.show view template (detail page)
-- [ ] 9. Create anime.stream view template (video player)
+## Summary:
+- ✅ Removed Tailwind CDN from layouts/app.blade.php & admin.blade.php
+- ✅ Added @vite directives & restored theme toggle
+- ✅ Created app.css (Tailwind directives) & fixed app.js (no bootstrap import)
+- ✅ Installed deps, Vite dev server running with HMR
+- ✅ Views cleared
+
+Tailwind now works via Vite build (custom config preserved). Refresh browser. Prod: `npm run build`. No design changes.

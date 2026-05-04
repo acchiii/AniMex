@@ -7,19 +7,7 @@
     <title>@yield('title', 'Dashboard') - AniMex Admin</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95' }
-                    }
-                }
-            }
-        };
-    </script>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         * { scrollbar-width: thin; scrollbar-color: #4b5563 transparent; }
         *::-webkit-scrollbar { width: 6px; }
