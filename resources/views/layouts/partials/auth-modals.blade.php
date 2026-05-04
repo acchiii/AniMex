@@ -77,7 +77,38 @@
 
 @push('scripts')
 <script>
+const recaptchaSiteKey = '{{ config('services.recaptcha.site_key') }}';
+const recaptchaEnabled = {{ config('services.recaptcha.enabled') ? 'true' : 'false' }};
+let recaptchaReady = false;
+
+function loadRecaptchaV3() {
+    if (!recaptchaEnabled || recaptchaReady || typeof grecaptcha !== 'undefined') return;
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?render=' + recaptchaSiteKey;
+    script.onload = () => { recaptchaReady = true; };
+    document.head.appendChild(script);
+}
+
+function getRecaptchaToken(action) {
+    return new Promise((resolve) => {
+        if (!recaptchaEnabled) { resolve(''); return; }
+        if (typeof grecaptcha === 'undefined') {
+            resolve('');
+            return;
+        }
+        grecaptcha.ready(function() {
+            grecaptcha.execute(recaptchaSiteKey, {action: action}).then(function(token) {
+                resolve(token || '');
+            }).catch(function() {
+                resolve('');
+            });
+        });
+        setTimeout(() => resolve(''), 5000);
+    });
+}
+
 function openAuthModal(mode) {
+    loadRecaptchaV3();
     const modal = document.getElementById('auth-modal');
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
@@ -110,70 +141,81 @@ function switchToRegister() {
     document.getElementById('auth-switch-text').innerHTML = 'Already have an account? <button onclick="switchToLogin()" class="text-purple-600 dark:text-purple-400 font-medium hover:text-purple-700 dark:hover:text-purple-300">Log in</button>';
 }
 
-// Handle form submissions via fetch
+// Handle login form submissions via fetch
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const form = this;
     const errorEl = document.getElementById('login-error');
     errorEl.classList.add('hidden');
 
-    fetch(form.action, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-        },
-        body: JSON.stringify(Object.fromEntries(new FormData(form))),
-    })
-    .then(async res => {
-        if (res.ok) {
-            window.location.reload();
-            return;
-        }
-        const data = await res.json().catch(() => ({}));
-        const msg = data.message || data.error || 'Invalid credentials.';
-        errorEl.textContent = msg;
-        errorEl.classList.remove('hidden');
-    })
-    .catch(() => {
-        errorEl.textContent = 'Something went wrong. Please try again.';
-        errorEl.classList.remove('hidden');
+    getRecaptchaToken('login').then(function(token) {
+        const formData = Object.fromEntries(new FormData(form));
+        formData['g-recaptcha-response'] = token;
+
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
+            },
+            body: JSON.stringify(formData),
+        })
+        .then(async res => {
+            if (res.ok) {
+                window.location.reload();
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const msg = data.message || data.error || 'Invalid credentials.';
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        })
+        .catch(() => {
+            errorEl.textContent = 'Something went wrong. Please try again.';
+            errorEl.classList.remove('hidden');
+        });
     });
 });
 
+// Handle register form submissions via fetch
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const form = this;
     const errorEl = document.getElementById('register-error');
     errorEl.classList.add('hidden');
 
-    fetch(form.action, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-        },
-        body: JSON.stringify(Object.fromEntries(new FormData(form))),
-    })
-    .then(async res => {
-        if (res.ok) {
-            window.location.reload();
-            return;
-        }
-        const data = await res.json().catch(() => ({}));
-        const msg = data.message || data.error || 'Registration failed.';
-        if (data.errors) {
-            errorEl.textContent = Object.values(data.errors).flat().join('. ');
-        } else {
-            errorEl.textContent = msg;
-        }
-        errorEl.classList.remove('hidden');
-    })
-    .catch(() => {
-        errorEl.textContent = 'Something went wrong. Please try again.';
-        errorEl.classList.remove('hidden');
+    getRecaptchaToken('register').then(function(token) {
+        const formData = Object.fromEntries(new FormData(form));
+        formData['g-recaptcha-response'] = token;
+
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
+            },
+            body: JSON.stringify(formData),
+        })
+        .then(async res => {
+            if (res.ok) {
+                window.location.reload();
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const msg = data.message || data.error || 'Registration failed.';
+            if (data.errors) {
+                errorEl.textContent = Object.values(data.errors).flat().join('. ');
+            } else {
+                errorEl.textContent = msg;
+            }
+            errorEl.classList.remove('hidden');
+        })
+        .catch(() => {
+            errorEl.textContent = 'Something went wrong. Please try again.';
+            errorEl.classList.remove('hidden');
+        });
     });
 });
 
@@ -181,5 +223,10 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeAuthModal();
 });
+
+// Load recaptcha if modal forms exist
+if (document.getElementById('login-form')) {
+    loadRecaptchaV3();
+}
 </script>
 @endpush

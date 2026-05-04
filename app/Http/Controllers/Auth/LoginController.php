@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Rules\ReCaptcha;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,13 +18,24 @@ class LoginController extends Controller
 
     public function store(Request $request)
     {
-        $credentials = $request->validate([
+        $rules = [
             'email' => 'required|email',
             'password' => 'required|string',
-        ]);
+        ];
+
+        if (config('services.recaptcha.enabled')) {
+            $rules['g-recaptcha-response'] = ['nullable', new ReCaptcha(0.5, 'login')];
+        }
+
+        $credentials = $request->validate($rules);
+
+        $authCredentials = [
+            'email' => $credentials['email'],
+            'password' => $credentials['password'],
+        ];
 
         $key = 'login:' . $request->ip();
-        
+
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
             if ($request->expectsJson()) {
@@ -32,7 +44,7 @@ class LoginController extends Controller
             return back()->with('error', 'Too many login attempts. Please try again in ' . ceil($seconds/60) . ' minutes.');
         }
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (Auth::attempt($authCredentials, $request->boolean('remember'))) {
             RateLimiter::clear($key);
             $request->session()->regenerate();
             

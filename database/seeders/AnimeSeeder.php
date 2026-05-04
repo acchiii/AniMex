@@ -10,6 +10,7 @@ use App\Models\Studio;
 use App\Models\Tag;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AnimeSeeder extends Seeder
 {
@@ -28,7 +29,7 @@ class AnimeSeeder extends Seeder
             'frieren' => 'https://cdn.myanimelist.net/images/anime/1015/138006.jpg',
             'spy-family' => 'https://cdn.myanimelist.net/images/anime/1441/138018.jpg',
             'chainsaw-man' => 'https://cdn.myanimelist.net/images/anime/1806/126216.jpg',
-            'mha-s7' => 'https://cdn.myanimelist.net/images/anime/1811/142888.jpg',
+            'mha-s7' => 'https://cdn.myanimelist.net/images/anime/1948/120625.jpg',
             'violet-evergarden' => 'https://cdn.myanimelist.net/images/anime/1795/95088.jpg',
             'one-piece' => 'https://cdn.myanimelist.net/images/anime/1244/138851.jpg',
             'death-note' => 'https://cdn.myanimelist.net/images/anime/1079/138100.jpg',
@@ -68,6 +69,11 @@ class AnimeSeeder extends Seeder
 
     public function run(): void
     {
+        // Clear existing data
+        DB::table('episodes')->delete();
+        DB::table('anime_genre')->delete();
+        DB::table('anime')->delete();
+
         $studios = Studio::all()->keyBy('name');
         $genres = Genre::all()->keyBy('name');
 

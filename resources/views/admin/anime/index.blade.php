@@ -26,7 +26,7 @@
                     <td class="px-5 py-3">
                         <div class="w-10 h-14 rounded overflow-hidden bg-gray-800">
                             @if($item->cover_image)
-                                <img src="{{ str_starts_with($item->cover_image, 'http') ? $item->cover_image : asset('storage/' . $item->cover_image) }}" class="w-full h-full object-cover">
+                                <img src="{{ str_starts_with($item->cover_image, 'http') ? $item->cover_image : asset('storage/' . $item->cover_image) }}" class="w-full h-full object-cover" onerror="this.style.display='none'">
                             @else
                                 <div class="w-full h-full flex items-center justify-center text-gray-600 text-xs font-bold">{{ substr($item->title, 0, 1) }}</div>
                             @endif

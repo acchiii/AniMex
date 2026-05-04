@@ -1,1 +1,1 @@
-console.log('AniMex app loaded via Vite');
+// console.log('AniMex app loaded via Vite');

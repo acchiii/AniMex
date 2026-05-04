@@ -65,7 +65,7 @@ class JikanService
             default => 'TV',
         };
 
-        $season = $data['season'] ?? null;
+        $season = isset($data['season']) ? ucfirst(strtolower($data['season'])) : null;
         $year = $data['year'] ?? null;
 
         $airedFrom = $data['aired']['from'] ?? null;
@@ -102,7 +102,7 @@ class JikanService
             'aired_from' => $airedFrom ? date('Y-m-d', strtotime($airedFrom)) : null,
             'aired_to' => $airedTo ? date('Y-m-d', strtotime($airedTo)) : null,
             'episodes_count' => $data['episodes'] ?? null,
-            'episode_duration' => $data['duration'] ? round($data['duration'] / 60) : null,
+            'episode_duration' => $data['duration'] ? $this->parseDuration($data['duration']) : null,
             'rating' => $this->mapRating($data['rating'] ?? ''),
             'source' => $data['source'] ?? null,
             'score' => $data['score'] ?? 0,
@@ -113,6 +113,17 @@ class JikanService
             'genres' => $genres,
             'studios' => $studios,
         ];
+    }
+
+    private function parseDuration(string $duration): ?int
+    {
+        if (preg_match('/(\d+)\s*hr\s*(\d*)\s*min/i', $duration, $matches)) {
+            return ((int)$matches[1] * 60) + (int)($matches[2] ?? 0);
+        }
+        if (preg_match('/(\d+)\s*min/i', $duration, $matches)) {
+            return (int)$matches[1];
+        }
+        return null;
     }
 
     private function mapRating(string $rating): string
