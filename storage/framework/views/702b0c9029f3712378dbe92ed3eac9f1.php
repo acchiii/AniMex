@@ -11,7 +11,7 @@
 <div class="relative">
     <!-- Banner Background -->
     <div class="absolute inset-0 h-[50vh] overflow-hidden">
-        <img src="<?php echo e($bannerUrl); ?>" alt="<?php echo e($anime->title); ?>" class="w-full h-full object-cover opacity-30">
+        <img src="<?php echo e($bannerUrl); ?>" alt="<?php echo e($anime->title); ?>" onerror="this.style.display='none'" class="w-full h-full object-cover opacity-30">
         <div class="absolute inset-0 bg-gradient-to-t from-gray-50 dark:from-gray-950 via-gray-50/80 dark:via-gray-950/80 to-transparent"></div>
     </div>
 
@@ -19,7 +19,7 @@
         <div class="flex flex-col md:flex-row gap-8">
             <!-- Cover Image -->
             <div class="flex-shrink-0 w-full md:w-64">
-                <img src="<?php echo e($coverUrl); ?>" alt="<?php echo e($anime->title); ?>" class="w-full rounded-lg shadow-xl">
+                <img src="<?php echo e($coverUrl); ?>" alt="<?php echo e($anime->title); ?>" onerror="this.style.display='none'" class="w-full rounded-lg shadow-xl">
             </div>
 
             <!-- Anime Info -->
