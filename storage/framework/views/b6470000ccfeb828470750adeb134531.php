@@ -2,7 +2,15 @@
 <?php $__env->startSection('page-title', 'Episodes: ' . ($anime->title_english ?: $anime->title)); ?>
 
 <?php $__env->startSection('header-actions'); ?>
-<a href="<?php echo e(route('admin.anime.index')); ?>" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm transition">&larr; Back to Anime</a>
+<div class="flex items-center gap-2">
+    <?php if($anime->anilist_id): ?>
+        <form action="<?php echo e(route('admin.anime.import-all-sources', $anime)); ?>" method="POST" onsubmit="return confirm('Import sources for all episodes? This may take a while.')">
+            <?php echo csrf_field(); ?>
+            <button type="submit" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-medium transition">Import All Sources</button>
+        </form>
+    <?php endif; ?>
+    <a href="<?php echo e(route('admin.anime.index')); ?>" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm transition">&larr; Back</a>
+</div>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -54,16 +62,19 @@
 
 
 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
         <h3 class="font-medium text-gray-900 dark:text-gray-100">
             <?php echo e($episodes->count()); ?> Episode<?php echo e($episodes->count() !== 1 ? 's' : ''); ?>
 
         </h3>
+        <?php if($anime->anilist_id): ?>
+            <span class="text-xs text-gray-500">AniList ID: <?php echo e($anime->anilist_id); ?></span>
+        <?php endif; ?>
     </div>
 
     <div class="divide-y divide-gray-200 dark:divide-gray-800">
         <?php $__empty_1 = true; $__currentLoopData = $episodes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ep): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-            <div class="px-5 py-4">
+            <div class="px-5 py-3">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 bg-purple-600/10 rounded-lg flex items-center justify-center text-sm font-medium text-purple-600 dark:text-purple-300 flex-shrink-0"><?php echo e($ep->number); ?></div>
                     <div class="flex-1 min-w-0">
@@ -72,14 +83,27 @@
                             <?php if($ep->duration): ?><?php echo e(floor($ep->duration / 60)); ?>:<?php echo e(str_pad($ep->duration % 60, 2, '0', STR_PAD_LEFT)); ?><?php endif; ?>
                             <?php if($ep->is_filler): ?><span class="ml-2 text-yellow-600 dark:text-yellow-400">Filler</span><?php endif; ?>
                             <?php if($ep->is_recap): ?><span class="ml-2 text-gray-500 dark:text-gray-400">Recap</span><?php endif; ?>
+                            <?php if($ep->sources->isNotEmpty()): ?>
+                                <span class="ml-2 text-green-600 dark:text-green-400"><?php echo e($ep->sources->count()); ?> source(s)</span>
+                            <?php else: ?>
+                                <span class="ml-2 text-red-500">No sources</span>
+                            <?php endif; ?>
                         </p>
                     </div>
                     <div class="flex items-center gap-1 text-xs">
-                        <?php if($ep->sources->isNotEmpty()): ?>
-                            <span class="text-gray-500 dark:text-gray-400"><?php echo e($ep->sources->count()); ?> source<?php echo e($ep->sources->count() > 1 ? 's' : ''); ?></span>
-                        <?php endif; ?>
                         <?php if($ep->is_subbed): ?><span class="text-blue-700 dark:text-blue-400">SUB</span><?php endif; ?>
                         <?php if($ep->is_dubbed): ?><span class="text-green-700 dark:text-green-400 ml-1">DUB</span><?php endif; ?>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <?php if($anime->anilist_id): ?>
+                            <form action="<?php echo e(route('admin.anime.episodes.import-sources', [$anime, $ep])); ?>" method="POST">
+                                <?php echo csrf_field(); ?>
+                                <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium">
+                                    <?php echo e($ep->sources->isEmpty() ? 'Import' : 'Re-import'); ?>
+
+                                </button>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -89,6 +113,5 @@
     </div>
 </div>
 <?php $__env->stopSection(); ?>
-
 
 <?php echo $__env->make('layouts.admin', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\AniMex\resources\views/admin/anime/episodes.blade.php ENDPATH**/ ?>

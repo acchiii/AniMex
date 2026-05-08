@@ -31,15 +31,15 @@
             <nav class="flex-1 overflow-y-auto p-4 space-y-1 bg-gray-50 dark:bg-gray-900">
                 <a href="<?php echo e(route('admin.dashboard')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm <?php echo e(request()->routeIs('admin.dashboard') ? 'bg-purple-600/10 text-purple-400' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'); ?> transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
-                    <span class="sr-only">Dashboard</span>
+                    Dashboard
                 </a>
                 <a href="<?php echo e(route('admin.anime.index')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm <?php echo e(request()->routeIs('admin.anime.*') ? 'bg-purple-600/10 text-purple-400' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'); ?> transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-4 3V1m-4 0h8m-8 0H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2h-3m-4 3h4m-4 0l4 4m4-4l-4 4"/></svg>
-                    <span class="sr-only">Anime</span>
+                    Anime
                 </a>
                 <a href="<?php echo e(route('admin.import.search')); ?>" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm <?php echo e(request()->routeIs('admin.import.*') ? 'bg-purple-600/10 text-purple-400' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'); ?> transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <span class="sr-only">Import Anime</span>
+                    Import Anime
                 </a>
                 <a href="<?php echo e(url('/')); ?>" target="_blank" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
@@ -90,7 +90,7 @@
                     </a>
                     <a href="<?php echo e(route('admin.import.search')); ?>" onclick="toggleAdminMobileMenu(false)" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm <?php echo e(request()->routeIs('admin.import.*') ? 'bg-purple-600/10 text-purple-400' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'); ?> transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <span class="sr-only">Import Anime</span>
+                        Import Anime
                     </a>
                     <a href="<?php echo e(url('/')); ?>" target="_blank" onclick="toggleAdminMobileMenu(false)" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>

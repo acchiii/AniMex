@@ -8,11 +8,12 @@ class EpisodeSource extends Model
 {
     protected $fillable = [
         'episode_id', 'video_server_id', 'label', 'quality', 
-        'url', 'type', 'language', 'is_active', 'sort_order'
+        'url', 'headers', 'type', 'language', 'is_active', 'sort_order'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'headers' => 'array',
     ];
 
     public function episode()

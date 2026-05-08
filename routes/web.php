@@ -70,6 +70,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/import', [\App\Http\Controllers\Admin\AdminJikanController::class, 'search'])->name('import.search');
     Route::post('/import/{malId}', [\App\Http\Controllers\Admin\AdminJikanController::class, 'import'])->name('import.anime');
+
+    Route::post('/anime/{anime}/episodes/{episode}/import-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importEpisodeSources'])->name('anime.episodes.import-sources');
+    Route::post('/anime/{anime}/import-all-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importAllEpisodeSources'])->name('anime.import-all-sources');
 });
 
 // API-like AJAX Routes

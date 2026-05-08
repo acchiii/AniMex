@@ -10,9 +10,13 @@ use App\Models\Rating;
 use App\Models\Favorite;
 use App\Models\Comment;
 use App\Models\WatchHistory;
+use App\Models\EpisodeSource;
+use App\Models\Subtitle;
+use App\Services\AnilistVideoSourceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /** Helper function for auth check */
 function user_check(): bool {
@@ -120,6 +124,14 @@ public function stream(string $slug, int $episodeNumber)
             }, 'subtitles'])
             ->firstOrFail();
 
+        // Auto-fetch sources if none exist
+        if ($episode->sources->isEmpty()) {
+            $this->fetchSourcesOnTheFly($anime, $episode);
+            $episode->load(['sources' => function ($q) {
+                $q->orderByDesc('quality');
+            }, 'subtitles']);
+        }
+
         // Next/Previous episodes
         $nextEpisode = $anime->episodes()->where('number', '>', $episodeNumber)->orderBy('number')->first();
         $prevEpisode = $anime->episodes()->where('number', '<', $episodeNumber)->orderByDesc('number')->first();
@@ -134,6 +146,56 @@ public function stream(string $slug, int $episodeNumber)
         }
 
         return view('anime.stream', compact('episode', 'anime', 'nextEpisode', 'prevEpisode'));
+    }
+
+    private function fetchSourcesOnTheFly($anime, $episode): void
+    {
+        try {
+            $service = app(AnilistVideoSourceService::class);
+            $result = $service->fetchEpisodeSources(
+                (int) ($anime->anilist_id ?? 0), (int) $episode->number, $anime->title
+            );
+
+            if (!empty($result['error']) || empty($result['sources'])) return;
+
+            DB::transaction(function () use ($episode, $result) {
+                $sort = 0;
+                foreach ($result['sources'] as $s) {
+                    $url = (string) ($s['url'] ?? '');
+                    if ($url === '') continue;
+
+                    EpisodeSource::create([
+                        'episode_id' => $episode->id,
+                        'video_server_id' => null,
+                        'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
+                        'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
+                        'url' => $url,
+                        'headers' => $s['headers'] ?? null,
+                        'type' => (string) ($s['type'] ?? 'hls'),
+                        'language' => (string) ($s['language'] ?? 'sub'),
+                        'is_active' => true,
+                        'sort_order' => $sort++,
+                    ]);
+                }
+
+                foreach ($result['subtitles'] ?? [] as $t) {
+                    $filePath = (string) ($t['file_path'] ?? '');
+                    if ($filePath === '') continue;
+
+                    Subtitle::create([
+                        'episode_id' => $episode->id,
+                        'language' => (string) ($t['language'] ?? 'en'),
+                        'label' => (string) ($t['label'] ?? strtoupper((string) ($t['language'] ?? 'en'))),
+                        'file_path' => $filePath,
+                        'is_default' => (bool) ($t['is_default'] ?? false),
+                    ]);
+                }
+            });
+        } catch (\Exception $e) {
+            logger()->error('On-the-fly source fetch failed: ' . $e->getMessage(), [
+                'anime' => $anime->id, 'episode' => $episode->id,
+            ]);
+        }
     }
 
     // ─── API-like Actions (for AJAX) ────────────────────────────────────────────
