@@ -126,10 +126,13 @@ public function stream(string $slug, int $episodeNumber)
 
         // Auto-fetch sources if none exist
         if ($episode->sources->isEmpty()) {
-            $this->fetchSourcesOnTheFly($anime, $episode);
+            $fetched = $this->fetchSourcesOnTheFly($anime, $episode);
             $episode->load(['sources' => function ($q) {
                 $q->orderByDesc('quality');
             }, 'subtitles']);
+            if ($episode->sources->isEmpty()) {
+                session()->flash('warning', $fetched ?: 'Could not find video sources for this episode.');
+            }
         }
 
         // Next/Previous episodes
@@ -148,15 +151,34 @@ public function stream(string $slug, int $episodeNumber)
         return view('anime.stream', compact('episode', 'anime', 'nextEpisode', 'prevEpisode'));
     }
 
-    private function fetchSourcesOnTheFly($anime, $episode): void
+    private function fetchSourcesOnTheFly($anime, $episode): ?string
     {
         try {
             $service = app(AnilistVideoSourceService::class);
-            $result = $service->fetchEpisodeSources(
-                (int) ($anime->anilist_id ?? 0), (int) $episode->number, $anime->title
-            );
+            $titles = array_unique(array_filter([
+                $anime->title,
+                $anime->title_english,
+                $anime->title_japanese,
+            ]));
 
-            if (!empty($result['error']) || empty($result['sources'])) return;
+            $result = null;
+            foreach ($titles as $t) {
+                $result = $service->fetchEpisodeSources(
+                    (int) ($anime->anilist_id ?? 0), (int) $episode->number, $t
+                );
+                if (empty($result['error']) && !empty($result['sources'])) {
+                    break;
+                }
+            }
+
+            if (!$result || !empty($result['error']) || empty($result['sources'])) {
+                $err = $result['error'] ?? 'All providers returned no sources';
+                logger()->warning('On-the-fly source fetch failed', [
+                    'anime' => $anime->id, 'episode' => $episode->id, 'titles' => $titles,
+                    'error' => $err,
+                ]);
+                return $err;
+            }
 
             DB::transaction(function () use ($episode, $result) {
                 $sort = 0;
@@ -191,10 +213,12 @@ public function stream(string $slug, int $episodeNumber)
                     ]);
                 }
             });
+            return null;
         } catch (\Exception $e) {
             logger()->error('On-the-fly source fetch failed: ' . $e->getMessage(), [
                 'anime' => $anime->id, 'episode' => $episode->id,
             ]);
+            return $e->getMessage();
         }
     }
 

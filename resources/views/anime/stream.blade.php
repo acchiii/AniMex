@@ -2,6 +2,11 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if(session('warning'))
+        <div class="mb-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg text-yellow-200 text-sm">
+            {{ session('warning') }}
+        </div>
+    @endif
     <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4" id="player-container">
         @if($episode->sources->count())
             <video id="video-player" class="w-full h-full @if($episode->sources->first()->type === 'embed') hidden @endif" controls preload="metadata"></video>

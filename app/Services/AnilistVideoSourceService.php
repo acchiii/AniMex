@@ -168,6 +168,57 @@ class AnilistVideoSourceService
         return compact('sources', 'subtitles') + ['headers' => $headers];
     }
 
+    private function findAnipubId(string $title): int
+    {
+        $findResp = Http::withHeaders(['Accept' => 'application/json'])
+            ->timeout(10)
+            ->get("{$this->anipubBaseUrl}/api/find/" . urlencode($title));
+
+        if ($findResp->ok()) {
+            $found = $findResp->json();
+            if (($found['exist'] ?? false) && !empty($found['id'])) {
+                return (int) $found['id'];
+            }
+        }
+
+        $searchResp = Http::withHeaders(['Accept' => 'application/json'])
+            ->timeout(10)
+            ->get("{$this->anipubBaseUrl}/api/search/" . urlencode($title));
+
+        if (!$searchResp->ok()) return 0;
+
+        $body = $searchResp->json();
+        if (empty($body) || isset($body['found']) && $body['found'] === false) return 0;
+
+        // Single object result (not wrapped in array)
+        if (isset($body['Id'])) {
+            return (int) $body['Id'];
+        }
+
+        // Array of results
+        if (is_array($body)) {
+            $titleLower = mb_strtolower($title);
+            $best = 0;
+            $bestScore = 0;
+
+            foreach ($body as $r) {
+                if (!is_array($r)) continue;
+                $name = (string) ($r['Name'] ?? '');
+                if ($name === '') continue;
+
+                similar_text($titleLower, mb_strtolower($name), $score);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $best = (int) ($r['Id'] ?? 0);
+                }
+            }
+
+            return $best;
+        }
+
+        return 0;
+    }
+
     private function tryAnipub(string $title, int $episodeNumber): array
     {
         try {

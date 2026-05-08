@@ -6428,3 +6428,10 @@ Did you mean one of these?
 #55 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://xampp//htdocs...')
 #56 {main}
 "} 
+[2026-05-08 19:03:28] local.WARNING: On-the-fly source fetch failed for all titles {"anime":241,"episode":1115,"titles":["Jujutsu Kaisen Season 2","Jujutsu Kaisen 2nd Season","呪術廻戦 第2期"],"error":"No sources found for AniList ID 145064, episode 1"} 
+[2026-05-08 19:04:16] local.WARNING: On-the-fly source fetch failed {"anime":242,"episode":1123,"titles":["Demon Slayer: Kimetsu no Yaiba","Demon Slayer","鬼滅の刃"],"error":"No sources found for AniList ID 101922, episode 4"} 
+[2026-05-08 19:04:27] local.WARNING: On-the-fly source fetch failed {"anime":242,"episode":1123,"titles":["Demon Slayer: Kimetsu no Yaiba","Demon Slayer","鬼滅の刃"],"error":"No sources found for AniList ID 101922, episode 4"} 
+[2026-05-08 19:05:15] local.WARNING: On-the-fly source fetch failed {"anime":241,"episode":1115,"titles":["Jujutsu Kaisen Season 2","Jujutsu Kaisen 2nd Season","呪術廻戦 第2期"],"error":"No sources found for AniList ID 145064, episode 1"} 
+[2026-05-08 19:05:40] local.WARNING: On-the-fly source fetch failed {"anime":241,"episode":1115,"titles":["Jujutsu Kaisen Season 2","Jujutsu Kaisen 2nd Season","呪術廻戦 第2期"],"error":"No sources found for AniList ID 145064, episode 1"} 
+[2026-05-08 19:06:19] local.WARNING: On-the-fly source fetch failed {"anime":242,"episode":1120,"titles":["Demon Slayer: Kimetsu no Yaiba","Demon Slayer","鬼滅の刃"],"error":"No sources found for AniList ID 101922, episode 1"} 
+[2026-05-08 19:06:50] local.WARNING: On-the-fly source fetch failed {"anime":245,"episode":1136,"titles":{"0":"Chainsaw Man","2":"チェンソーマン"},"error":"No sources found for AniList ID 127230, episode 2"} 
