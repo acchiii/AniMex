@@ -6,8 +6,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\AnimeController;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\Admin\AdminDashboardController;
-use App\Http\Controllers\Admin\AdminAnimeController;
+use App\Http\Controllers\ProfileController;
+
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
@@ -30,14 +30,31 @@ Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store']);
 
-// API-like AJAX Routes
-Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
-Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
-Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminAnimeController;
+
+// Profile Routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::post('/email/verification-notification', [ProfileController::class, 'resendVerification'])
+        ->middleware('throttle:6,1')
+        ->name('verification.resend');
+});
 
 // Admin Routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    // Admin login overlay
+
+    Route::get('/login', function () {
+        return redirect()->route('admin.dashboard');
+    })->name('login');
+
+    Route::post('/login', [\App\Http\Controllers\Admin\AdminLoginController::class, 'login'])->name('login.post');
+
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard')->middleware('admin');
+
 
     Route::get('/anime', [AdminAnimeController::class, 'index'])->name('anime.index');
     Route::get('/anime/create', [AdminAnimeController::class, 'create'])->name('anime.create');
@@ -54,3 +71,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/import', [\App\Http\Controllers\Admin\AdminJikanController::class, 'search'])->name('import.search');
     Route::post('/import/{malId}', [\App\Http\Controllers\Admin\AdminJikanController::class, 'import'])->name('import.anime');
 });
+
+// API-like AJAX Routes
+Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
+Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
+Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
+

@@ -4,30 +4,42 @@
 @section('page-title', 'Import from Jikan/MyAnimeList')
 
 @section('header-actions')
-<a href="{{ route('admin.anime.index') }}" class="text-gray-400 hover:text-gray-200 text-sm transition">&larr; Back to Anime</a>
+<a href="{{ route('admin.anime.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm transition">&larr; Back to Anime</a>
 @endsection
 
 @section('content')
 <form action="{{ route('admin.import.search') }}" method="GET" class="mb-6">
     <div class="flex gap-3">
-        <input type="text" name="q" value="{{ $query ?? '' }}" placeholder="Search anime..." required
-            class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600">
+        <input
+            type="text"
+            name="q"
+            value="{{ $query ?? '' }}"
+            placeholder="Search anime..."
+            required
+            class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-600"
+        >
         <button type="submit" class="bg-purple-600 hover:bg-purple-700 px-6 py-2.5 rounded-lg text-sm font-medium transition">Search</button>
     </div>
 </form>
 
 @if(isset($parsed) && count($parsed) > 0)
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <div class="divide-y divide-gray-800">
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <div class="divide-y divide-gray-200 dark:divide-gray-800">
             @foreach($parsed as $item)
                 <div class="flex items-center gap-4 px-5 py-4">
-                    <img src="{{ $item['image'] }}" class="w-16 h-24 rounded-lg object-cover flex-shrink-0 bg-gray-800" alt="{{ $item['title'] }}">
+                    <img
+                        src="{{ $item['image'] }}"
+                        class="w-16 h-24 rounded-lg object-cover flex-shrink-0 bg-gray-100 dark:bg-gray-800"
+                        alt="{{ $item['title'] }}"
+                    >
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium">{{ $item['title_english'] ?: $item['title'] }}</p>
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item['title_english'] ?: $item['title'] }}</p>
                         @if($item['title'] !== $item['title_english'])
-                            <p class="text-xs text-gray-500 truncate">{{ $item['title'] }}</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $item['title'] }}</p>
                         @endif
-                        <p class="text-xs text-gray-500 mt-1">{{ $item['type'] }} &middot; {{ $item['episodes'] }} eps &middot; Score: {{ $item['score'] }} &middot; {{ $item['status'] }}</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            {{ $item['type'] }} &middot; {{ $item['episodes'] }} eps &middot; Score: {{ $item['score'] }} &middot; {{ $item['status'] }}
+                        </p>
                     </div>
                     <form action="{{ route('admin.import.anime', $item['mal_id']) }}" method="POST">
                         @csrf
@@ -38,8 +50,9 @@
         </div>
     </div>
 @elseif(isset($query))
-    <div class="text-center py-16 text-gray-500">
+    <div class="text-center py-16 text-gray-600 dark:text-gray-400">
         <p class="text-lg">No results found for "{{ $query }}".</p>
     </div>
 @endif
 @endsection
+

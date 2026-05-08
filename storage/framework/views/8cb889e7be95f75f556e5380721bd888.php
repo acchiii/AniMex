@@ -20,7 +20,43 @@
                 </form>
 
                 <?php if(auth()->guard()->check()): ?>
-                    <a href="<?php echo e(url('/dashboard')); ?>" class="hidden lg:block text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition">Dashboard</a>
+                    <div class="relative">
+                        <button type="button" class="flex items-center gap-2" onclick="document.getElementById('user-dropdown').classList.toggle('hidden')">
+                            <img src="<?php echo e(auth()->user()->getAvatarUrlAttribute()); ?>" alt="Avatar" class="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 object-cover">
+                        </button>
+
+                        <div id="user-dropdown" class="hidden absolute right-0 mt-3 w-56 bg-white/90 dark:bg-[#0a0a0f]/90 backdrop-blur-lg border border-gray-200 dark:border-gray-800/60 rounded-2xl shadow-lg overflow-hidden z-50">
+                            <div class="px-4 py-3 border-b border-gray-200/60 dark:border-gray-800/60">
+                                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100"><?php echo e(auth()->user()->name); ?></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(auth()->user()->email); ?></p>
+                                <?php if(!auth()->user()->hasVerifiedEmail()): ?>
+                                    <p class="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">Email not verified</p>
+                                <?php endif; ?>
+                            </div>
+
+                            <a href="<?php echo e(route('profile.show')); ?>" class="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">
+                                <span class="mr-2">👤</span> Profile
+                            </a>
+
+                            <?php if(!auth()->user()->hasVerifiedEmail()): ?>
+                                <form method="POST" action="<?php echo e(route('verification.resend')); ?>" class="block">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="w-full text-left px-4 py-3 text-sm text-amber-700 dark:text-amber-400 hover:bg-gray-100 dark:hover:bg-white/5">
+                                        Verify email
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+
+                            <div class="border-t border-gray-200/60 dark:border-gray-800/60">
+                                <form method="POST" action="<?php echo e(route('logout')); ?>">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">
+                                        Logout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 <?php else: ?>
                     <button onclick="openAuthModal('login')" class="hidden lg:block text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition">Log in</button>
                     <button onclick="openAuthModal('register')" class="hidden lg:block bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-full text-sm font-medium text-white transition shadow-sm shadow-purple-600/20">Sign up</button>
@@ -47,7 +83,7 @@
             <a href="<?php echo e(route('anime.popular')); ?>" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 <?php echo e(request()->routeIs('anime.popular') ? 'bg-gray-100 dark:bg-white/5 text-purple-600 dark:text-purple-400' : ''); ?>">Popular</a>
             <a href="<?php echo e(route('anime.schedule')); ?>" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 <?php echo e(request()->routeIs('anime.schedule') ? 'bg-gray-100 dark:bg-white/5 text-purple-600 dark:text-purple-400' : ''); ?>">Schedule</a>
             <?php if(auth()->guard()->check()): ?>
-                <a href="<?php echo e(url('/dashboard')); ?>" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5">Dashboard</a>
+                <a href="<?php echo e(route('profile.show')); ?>" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5">👤 Profile</a>
             <?php else: ?>
                 <div class="pt-4 border-t border-gray-200 dark:border-gray-800/60 space-y-2">
                     <button onclick="openAuthModal('login'); toggleMobileMenu();" class="block w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5">Log in</button>

@@ -2,7 +2,8 @@
 <div id="auth-modal" class="fixed inset-0 z-[100] hidden">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAuthModal()"></div>
     <div class="relative flex items-center justify-center min-h-screen px-4">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+        <div class="bg-white dark:bg-[#0a0a0f] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+
             <div class="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
                 <h2 id="auth-modal-title" class="text-xl font-semibold text-gray-900 dark:text-white">Log in</h2>
                 <button onclick="closeAuthModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition">

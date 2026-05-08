@@ -9,7 +9,11 @@ class GenreSeeder extends Seeder
 {
     public function run(): void
     {
+        // Make this seeder idempotent for local development (avoid UNIQUE slug collisions)
+        \Illuminate\Support\Facades\DB::table('genres')->delete();
+
         $genres = [
+
             ['name' => 'Action', 'slug' => 'action', 'color' => '#EF4444', 'sort_order' => 1],
             ['name' => 'Adventure', 'slug' => 'adventure', 'color' => '#F59E0B', 'sort_order' => 2],
             ['name' => 'Comedy', 'slug' => 'comedy', 'color' => '#10B981', 'sort_order' => 3],

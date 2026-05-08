@@ -10,7 +10,11 @@ class StudioSeeder extends Seeder
 {
     public function run(): void
     {
+        // Make this seeder idempotent for local development (avoid UNIQUE slug collisions)
+        \Illuminate\Support\Facades\DB::table('studios')->delete();
+
         $studios = [
+
             ['name' => 'MAPPA', 'slug' => 'mappa', 'description' => 'Japanese animation studio known for Attack on Titan Final Season, Jujutsu Kaisen, and Chainsaw Man.'],
             ['name' => 'Ufotable', 'slug' => 'ufotable', 'description' => 'Known for Demon Slayer and Fate series with stunning animation quality.'],
             ['name' => 'Wit Studio', 'slug' => 'wit-studio', 'description' => 'Former studio for Attack on Titan Seasons 1-3, also known for Spy x Family and Vinland Saga.'],

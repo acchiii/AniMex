@@ -6,7 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class AdminMiddleware
+class EnsureAdminForAdminRoutes
 {
     public function handle(Request $request, Closure $next): Response
     {
@@ -17,6 +17,6 @@ class AdminMiddleware
         }
 
         return $next($request);
-
     }
 }
+

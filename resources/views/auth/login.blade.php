@@ -34,7 +34,8 @@ function executeLoginCaptcha(form) {
             </div>
         @endif
 
-        <form method="POST" action="{{ route('login') }}" class="space-y-4" onsubmit="event.preventDefault(); executeLoginCaptcha(this);">
+        <form method="POST" action="{{ route('login') }}" class="space-y-4" @if(config('services.recaptcha.enabled')) onsubmit="event.preventDefault(); executeLoginCaptcha(this);" @endif>
+
             @csrf
 
             <div>
