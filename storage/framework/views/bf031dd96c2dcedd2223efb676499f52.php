@@ -154,13 +154,23 @@ function loadSource(index) {
         });
         hls.on(Hls.Events.ERROR, function(event, data) {
             console.warn('HLS error:', data.type, data.details, data.fatal);
-            if (data.fatal && data.details === 'manifestLoadError') {
-                hls.loadSource(src.url);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    player.play().catch(function() {
-                        playOverlay.classList.remove('hidden');
-                    });
-                });
+            if (data.fatal) {
+                if (data.details === 'manifestLoadError' || data.details === 'levelLoadError') {
+                    if (src.url && src.url.match(/^https?:\/\//)) {
+                        console.warn('Falling back to direct source URL');
+                        hls.loadSource(src.url);
+                        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                            player.play().catch(function() {
+                                playOverlay.classList.remove('hidden');
+                            });
+                        });
+                    } else {
+                        console.error('Source URL is invalid, cannot fallback');
+                    }
+                } else if (data.details === 'fragParsingError' || data.details === 'bufferStalledError') {
+                    console.warn('Attempting recovery on frag parsing error');
+                    hls.startLoad();
+                }
             }
         });
         return;
@@ -219,7 +229,7 @@ if (player) {
 }
 
 function saveProgress(progress, duration) {
-    fetch('<?php echo e(route("home")); ?>', {
+    fetch('<?php echo e(route("progress.save")); ?>', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

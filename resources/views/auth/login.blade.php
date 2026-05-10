@@ -40,7 +40,7 @@ function executeLoginCaptcha(form) {
 
             <div>
                 <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                <input type="email" name="email" id="email" required autofocus
+                <input type="email" name="email" id="email" required autofocus autocomplete="email"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                 @error('email')
                     <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
@@ -49,7 +49,7 @@ function executeLoginCaptcha(form) {
 
             <div>
                 <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                <input type="password" name="password" id="password" required
+                <input type="password" name="password" id="password" required autocomplete="current-password"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                 @error('password')
                     <p class="text-red-500 text-sm mt-1">{{ $message }}</p>

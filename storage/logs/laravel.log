@@ -48,3 +48,46 @@
 [stacktrace]
 #0 {main}
 "} 
+[2026-05-10 01:57:25] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlHandler.php:45)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 01:57:33] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":16498,"episode":3,"used_title":"Attack on Titan"} 
+[2026-05-10 01:58:40] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":145064,"episode":1,"used_title":"Jujutsu Kaisen Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-10 01:59:09] local.ERROR: Maximum execution time of 60 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 60 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php:695)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:01:17] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":145064,"episode":1,"used_title":"Jujutsu Kaisen Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-10 02:01:44] local.ERROR: Maximum execution time of 60 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 60 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php:695)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:02:15] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":145064,"episode":1,"used_title":"Jujutsu Kaisen Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-10 02:02:42] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":145064,"episode":1,"used_title":"Jujutsu Kaisen 2nd Season","error":"Watch endpoint returned 404"} 
+[2026-05-10 02:03:06] local.ERROR: Maximum execution time of 60 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 60 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlHandler.php:45)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:05:49] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlHandler.php:45)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:24:01] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":21511,"episode":1,"used_title":"Your Name"} 
+[2026-05-10 02:26:03] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php:501)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:35:32] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php:501)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:52:08] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlHandler.php:45)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-10 02:53:36] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":116674,"episode":1,"used_title":"Bleach: Thousand-Year Blood War"} 
+[2026-05-10 02:55:40] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlHandler.php:45)
+[stacktrace]
+#0 {main}
+"} 

@@ -10,6 +10,7 @@ use App\Models\Rating;
 use App\Models\Favorite;
 use App\Models\Comment;
 use App\Models\WatchHistory;
+use App\Models\Episode;
 use App\Models\EpisodeSource;
 use App\Models\Subtitle;
 use App\Services\AnilistVideoSourceService;
@@ -185,7 +186,7 @@ public function stream(string $slug, int $episodeNumber)
                 $sort = 0;
                 foreach ($result['sources'] as $s) {
                     $url = (string) ($s['url'] ?? '');
-                    if ($url === '') continue;
+                    if ($url === '' || !$this->isValidSourceUrl($url)) continue;
 
                     EpisodeSource::create([
                         'episode_id' => $episode->id,
@@ -381,6 +382,10 @@ public function stream(string $slug, int $episodeNumber)
         $url = $source->url;
         $headers = $source->headers ?? [];
 
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            return response('Invalid source URL', 502);
+        }
+
         if ($source->type === 'embed') {
             return redirect()->away($url);
         }
@@ -423,20 +428,11 @@ public function stream(string $slug, int $episodeNumber)
             return response('', 502);
         }
 
-        $isM3u8 = $contentType && str_contains($contentType, 'mpegurl') || str_ends_with($url, '.m3u8');
+        $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8');
 
         if ($isM3u8 && !$range) {
-            $baseUrl = dirname($url);
             $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
-            $body = preg_replace_callback(
-                '/^(?!#)(.+\.(?:ts|m3u8|mp4|key))(.*)$/m',
-                function ($m) use ($proxySegmentUrl) {
-                    $cleaned = ltrim($m[1], './');
-                    $rest = $m[2] ?? '';
-                    return $proxySegmentUrl . '?path=' . urlencode($cleaned . $rest);
-                },
-                $body
-            );
+            $body = $this->rewriteM3u8Urls($body, $proxySegmentUrl, $url);
             $contentLength = null;
         }
 
@@ -454,6 +450,55 @@ public function stream(string $slug, int $episodeNumber)
         $status = $range ? 206 : 200;
 
         return response($body, $status, $respHeaders);
+    }
+
+    private function rewriteM3u8Urls(string $body, string $proxySegmentUrl, string $originalUrl): string
+    {
+        $baseUrl = dirname($originalUrl);
+        $body = str_replace(["\r\n", "\r"], "\n", $body);
+
+        $body = preg_replace_callback(
+            '/^(?!#)(\S+)/m',
+            function ($m) use ($proxySegmentUrl, $baseUrl) {
+                $line = trim($m[1]);
+                if ($line === '' || str_starts_with($line, 'http://') || str_starts_with($line, 'https://')) {
+                    $path = $line;
+                } elseif (str_starts_with($line, '/')) {
+                    $parsed = parse_url($baseUrl);
+                    $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+                    $path = $origin . $line;
+                } else {
+                    $path = rtrim($baseUrl, '/') . '/' . ltrim($line, './');
+                }
+                return $proxySegmentUrl . '?path=' . urlencode($path);
+            },
+            $body
+        );
+
+        $body = preg_replace_callback(
+            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
+            function ($m) use ($proxySegmentUrl) {
+                $uri = $m[3];
+                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+            },
+            $body
+        );
+
+        return $body;
+    }
+
+    private function isValidSourceUrl(string $url): bool
+    {
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            return false;
+        }
+
+        if (preg_match('/\.(replace|replaceAll|toString|split|join|concat)\(/', $url)) {
+            logger()->warning('Filtered out malformed source URL', ['url' => $url]);
+            return false;
+        }
+
+        return (bool) filter_var($url, FILTER_VALIDATE_URL);
     }
 
     private function resolveSegmentUrl(string $baseUrl, string $path): string
@@ -514,32 +559,26 @@ public function stream(string $slug, int $episodeNumber)
         $contentType = $response->header('Content-Type');
         $body = $response->body();
 
+        if (empty($body)) {
+            abort(502, 'Empty segment response');
+        }
+
         $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($path, '.m3u8');
 
-        // Recursively rewrite relative URLs inside sub-M3U8 playlists
         if ($isM3u8) {
             $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
-            $pathDir = dirname($path);
-            $pathPrefix = ($pathDir !== '.' && $pathDir !== '/') ? $pathDir . '/' : '';
-            $body = preg_replace_callback(
-                '/^(?!#)(.+\.(?:ts|m3u8|mp4|key))(.*)$/m',
-                function ($m) use ($proxySegmentUrl, $pathPrefix) {
-                    $matched = $m[1];
-                    $rest = $m[2] ?? '';
-                    if (str_starts_with($matched, 'http://') || str_starts_with($matched, 'https://') || str_starts_with($matched, '/')) {
-                        $fullPath = $matched . $rest;
-                    } else {
-                        $fullPath = $pathPrefix . ltrim($matched, './') . $rest;
-                    }
-                    return $proxySegmentUrl . '?path=' . urlencode($fullPath);
-                },
-                $body
-            );
+            $body = $this->rewriteM3u8UrlsForSubPlaylist($body, $proxySegmentUrl, $path, $baseUrl);
             return response($body, 200, [
                 'Content-Type' => 'application/vnd.apple.mpegurl',
                 'Access-Control-Allow-Origin' => '*',
                 'Cache-Control' => 'public, max-age=3600',
             ]);
+        }
+
+        if ($contentType && !str_contains($contentType, 'video') && !str_contains($contentType, 'octet-stream') && !str_contains($contentType, 'binary')) {
+            if (str_contains($contentType, 'text') || str_contains($contentType, 'html')) {
+                abort(502, 'Invalid segment content type: ' . $contentType);
+            }
         }
 
         $stream = $response->toPsrResponse()->getBody();
@@ -554,5 +593,44 @@ public function stream(string $slug, int $episodeNumber)
             'Cache-Control' => 'public, max-age=3600',
             'Access-Control-Allow-Origin' => '*',
         ]);
+    }
+
+    private function rewriteM3u8UrlsForSubPlaylist(string $body, string $proxySegmentUrl, string $currentPath, string $baseUrl): string
+    {
+        $pathDir = dirname($currentPath);
+        $body = str_replace(["\r\n", "\r"], "\n", $body);
+
+        $body = preg_replace_callback(
+            '/^(?!#)(\S+)/m',
+            function ($m) use ($proxySegmentUrl, $pathDir, $baseUrl) {
+                $line = trim($m[1]);
+                if ($line === '') return $m[0];
+
+                if (str_starts_with($line, 'http://') || str_starts_with($line, 'https://')) {
+                    $fullPath = $line;
+                } elseif (str_starts_with($line, '/')) {
+                    $parsed = parse_url($baseUrl);
+                    $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+                    $fullPath = $origin . $line;
+                } else {
+                    $prefix = ($pathDir && $pathDir !== '.' && $pathDir !== '/') ? $pathDir . '/' : '';
+                    $fullPath = $prefix . ltrim($line, './');
+                }
+
+                return $proxySegmentUrl . '?path=' . urlencode($fullPath);
+            },
+            $body
+        );
+
+        $body = preg_replace_callback(
+            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
+            function ($m) use ($proxySegmentUrl) {
+                $uri = $m[3];
+                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+            },
+            $body
+        );
+
+        return $body;
     }
 }
