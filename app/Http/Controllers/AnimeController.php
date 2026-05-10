@@ -347,8 +347,37 @@ public function stream(string $slug, int $episodeNumber)
         return view('anime.recent', compact('anime'));
     }
 
+    public function saveProgress(Request $request)
+    {
+        $data = $request->validate([
+            'episode_id' => 'required|exists:episodes,id',
+            'progress' => 'required|integer|min:0',
+            'duration' => 'required|integer|min:0',
+        ]);
+
+        if ($user = Auth::user()) {
+            WatchHistory::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'episode_id' => $data['episode_id'],
+                ],
+                [
+                    'anime_id' => Episode::find($data['episode_id'])?->anime_id,
+                    'progress' => $data['progress'],
+                    'duration' => $data['duration'],
+                    'completed' => $data['progress'] > 0 && $data['duration'] > 0 && $data['progress'] >= $data['duration'] * 0.9,
+                    'watched_at' => now(),
+                ]
+            );
+        }
+
+        return response('', 204);
+    }
+
     public function proxySource(Request $request, EpisodeSource $source)
     {
+        @set_time_limit(120);
+
         $url = $source->url;
         $headers = $source->headers ?? [];
 
@@ -450,6 +479,8 @@ public function stream(string $slug, int $episodeNumber)
 
     public function proxySegment(Request $request, $sourceId)
     {
+        @set_time_limit(120);
+
         $source = EpisodeSource::findOrFail($sourceId);
         $path = $request->query('path');
         if (!$path) {

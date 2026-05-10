@@ -84,4 +84,5 @@ Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->
 Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
 Route::get('/proxy/source/{source}', [AnimeController::class, 'proxySource'])->name('proxy.source');
 Route::get('/proxy/segment/{sourceId}', [AnimeController::class, 'proxySegment'])->name('proxy.segment');
+Route::post('/progress', [AnimeController::class, 'saveProgress'])->name('progress.save');
 
