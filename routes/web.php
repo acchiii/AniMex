@@ -73,10 +73,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::post('/anime/{anime}/episodes/{episode}/import-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importEpisodeSources'])->name('anime.episodes.import-sources');
     Route::post('/anime/{anime}/import-all-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importAllEpisodeSources'])->name('anime.import-all-sources');
+    Route::post('/anime/{anime}/fetch-episode-list', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'fetchEpisodeList'])->name('anime.fetch-episode-list');
+    Route::post('/anime/{anime}/episodes/{episode}/sources', [\App\Http\Controllers\Admin\AdminAnimeController::class, 'storeSource'])->name('anime.episodes.sources.store');
+    Route::delete('/anime/{anime}/episodes/{episode}/sources/{source}', [\App\Http\Controllers\Admin\AdminAnimeController::class, 'destroySource'])->name('anime.episodes.sources.destroy');
 });
 
 // API-like AJAX Routes
 Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
 Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
 Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
+Route::get('/proxy/source/{source}', [AnimeController::class, 'proxySource'])->name('proxy.source');
+Route::get('/proxy/segment/{sourceId}', [AnimeController::class, 'proxySegment'])->name('proxy.segment');
 

@@ -7,14 +7,17 @@
             {{ session('warning') }}
         </div>
     @endif
-    <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4" id="player-container">
+    <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4 relative" id="player-container">
         @if($episode->sources->count())
             <video id="video-player" class="w-full h-full @if($episode->sources->first()->type === 'embed') hidden @endif" controls preload="metadata"></video>
             <iframe id="embed-player" class="w-full h-full @if($episode->sources->first()->type !== 'embed') hidden @endif" frameborder="0" allowfullscreen></iframe>
+            <div id="play-overlay" class="absolute inset-0 flex items-center justify-center bg-black/60 cursor-pointer hidden" onclick="playVideo()">
+                <svg class="w-20 h-20 text-white opacity-80 hover:opacity-100 transition" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
         @else
             <div class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                 <div class="text-center">
-                    <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></video>
                     <p>No video sources available</p>
                 </div>
             </div>
@@ -45,7 +48,7 @@
             <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Video Source</h3>
             <div class="flex flex-wrap gap-2">
                 @foreach($episode->sources as $index => $source)
-                    <button onclick="changeSource({{ $index }})" 
+                    <button onclick="changeSource({{ $index }})"
                         class="source-btn px-3 py-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 {{ $index === 0 ? 'ring-2 ring-purple-500' : '' }}"
                         data-index="{{ $index }}">
                         {{ $source->quality }}@if($source->server) - {{ $source->server->name }}@endif
@@ -81,6 +84,7 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 @php
     $sourcesData = $episode->sources->map(fn($s) => [
+        'id' => $s->id,
         'url' => $s->url,
         'type' => $s->type ?? 'mp4',
         'headers' => $s->headers ?? [],
@@ -98,15 +102,23 @@ const subtitles = @json($subtitlesData);
 let hls = null;
 const player = document.getElementById('video-player');
 const embedPlayer = document.getElementById('embed-player');
+const playOverlay = document.getElementById('play-overlay');
+
+function playVideo() {
+    playOverlay.classList.add('hidden');
+    if (hls) { hls.startLoad(); }
+    player.play().catch(function(e) {
+        console.warn('playVideo failed:', e);
+    });
+}
 
 function loadSource(index) {
     const src = sources[index];
     if (!src) return;
 
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
+    console.log('Loading source', index, src);
+
+    if (hls) { hls.destroy(); hls = null; }
 
     player.classList.add('hidden');
     embedPlayer.classList.add('hidden');
@@ -121,29 +133,47 @@ function loadSource(index) {
 
     player.classList.remove('hidden');
 
-    if (src.type === 'hls' && Hls.isSupported()) {
+    const proxyUrl = '{{ route("proxy.source", "") }}/' + src.id;
+    const isHls = src.type === 'hls' || String(src.url).match(/\.m3u8/i);
+
+    if (isHls && Hls.isSupported()) {
         hls = new Hls({
             xhrSetup: function(xhr, url) {
                 for (const [key, val] of Object.entries(src.headers || {})) {
-                    xhr.setRequestHeader(key, val);
+                    try { xhr.setRequestHeader(key, val); } catch(e) {}
                 }
             }
         });
-        hls.loadSource(src.url);
+        hls.loadSource(proxyUrl);
         hls.attachMedia(player);
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            player.play();
+            player.play().catch(function() {
+                playOverlay.classList.remove('hidden');
+            });
         });
-    } else if (player.canPlayType('application/vnd.apple.mpegurl')) {
-        player.src = src.url;
-        player.play();
-    } else {
-        player.src = src.url;
-        player.play();
+        hls.on(Hls.Events.ERROR, function(event, data) {
+            console.warn('HLS error:', data.type, data.details, data.fatal);
+            if (data.fatal && data.details === 'manifestLoadError') {
+                hls.loadSource(src.url);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    player.play().catch(function() {
+                        playOverlay.classList.remove('hidden');
+                    });
+                });
+            }
+        });
+        return;
     }
+
+    player.src = proxyUrl;
+    player.load();
+    player.play().catch(function() {
+        playOverlay.classList.remove('hidden');
+    });
 }
 
 function changeSource(index) {
+    playOverlay.classList.add('hidden');
     loadSource(index);
     document.querySelectorAll('.source-btn').forEach(btn => {
         btn.classList.remove('ring-2', 'ring-purple-500');
@@ -178,6 +208,12 @@ if (player) {
         if (Math.floor(player.currentTime) % 10 === 0) {
             saveProgress(Math.floor(player.currentTime), Math.floor(player.duration));
         }
+    });
+    player.addEventListener('error', function() {
+        console.warn('Video error:', player.error ? player.error.message : 'unknown', 'code:', player.error ? player.error.code : 'none');
+    });
+    player.addEventListener('loadedmetadata', function() {
+        console.log('Video loaded, duration:', player.duration);
     });
 }
 

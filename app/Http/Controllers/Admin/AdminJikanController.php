@@ -62,6 +62,11 @@ class AdminJikanController extends Controller
             return redirect()->route('admin.anime.edit', $existing)->with('info', 'This anime already exists in your database.');
         }
 
+        $existingBySlug = Anime::where('slug', $parsed['slug'])->first();
+        if ($existingBySlug) {
+            $parsed['slug'] = $parsed['slug'] . '-' . $malId;
+        }
+
         $studioId = null;
         if (!empty($parsed['studios'])) {
             $studio = Studio::firstOrCreate(['name' => $parsed['studios'][0]['name']], [

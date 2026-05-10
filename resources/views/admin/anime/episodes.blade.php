@@ -5,12 +5,6 @@
 
 @section('header-actions')
 <div class="flex items-center gap-2">
-    @if($anime->anilist_id)
-        <form action="{{ route('admin.anime.import-all-sources', $anime) }}" method="POST" onsubmit="return confirm('Import sources for all episodes? This may take a while.')">
-            @csrf
-            <button type="submit" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-medium transition">Import All Sources</button>
-        </form>
-    @endif
     <a href="{{ route('admin.anime.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm transition">&larr; Back</a>
 </div>
 @endsection
@@ -69,7 +63,21 @@
             {{ $episodes->count() }} Episode{{ $episodes->count() !== 1 ? 's' : '' }}
         </h3>
         @if($anime->anilist_id)
-            <span class="text-xs text-gray-500">AniList ID: {{ $anime->anilist_id }}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">AniList ID: {{ $anime->anilist_id }}</span>
+                <form action="{{ route('admin.anime.fetch-episode-list', $anime) }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                        Fetch Episodes
+                    </button>
+                </form>
+                <form action="{{ route('admin.anime.import-all-sources', $anime) }}" method="POST" class="inline" onsubmit="return confirm('Import sources for ALL episodes without sources? This may take a while.')">
+                    @csrf
+                    <button type="submit" class="text-xs bg-green-600 hover:bg-green-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                        Import All Sources
+                    </button>
+                </form>
+            </div>
         @endif
     </div>
 
@@ -90,6 +98,26 @@
                                 <span class="ml-2 text-red-500">No sources</span>
                             @endif
                         </p>
+
+                        {{-- Source list --}}
+                        @if($ep->sources->isNotEmpty())
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                @foreach($ep->sources as $source)
+                                    <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 text-xs">
+                                        <span class="text-gray-700 dark:text-gray-300">{{ $source->quality }}</span>
+                                        <span class="text-gray-400">|</span>
+                                        <span class="text-gray-600 dark:text-gray-400">{{ $source->type }}</span>
+                                        <span class="text-gray-400">|</span>
+                                        <span class="text-gray-600 dark:text-gray-400">{{ $source->language }}</span>
+                                        <form action="{{ route('admin.anime.episodes.sources.destroy', [$anime, $ep, $source]) }}" method="POST" class="inline" onsubmit="return confirm('Delete this source?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-500 hover:text-red-700 ml-1">&times;</button>
+                                        </form>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                     <div class="flex items-center gap-1 text-xs">
                         @if($ep->is_subbed)<span class="text-blue-700 dark:text-blue-400">SUB</span>@endif
@@ -97,14 +125,59 @@
                     </div>
                     <div class="flex items-center gap-1">
                         @if($anime->anilist_id)
-                            <form action="{{ route('admin.anime.episodes.import-sources', [$anime, $ep]) }}" method="POST">
+                            <form action="{{ route('admin.anime.episodes.import-sources', [$anime, $ep]) }}" method="POST" class="inline">
                                 @csrf
-                                <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium">
-                                    {{ $ep->sources->isEmpty() ? 'Import' : 'Re-import' }}
+                                <button type="submit" class="text-xs bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                                    Import
                                 </button>
                             </form>
                         @endif
+                        <button onclick="toggleSourceForm({{ $ep->id }})" class="text-xs bg-gray-600 hover:bg-gray-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                            + Source
+                        </button>
                     </div>
+                </div>
+
+                {{-- Add Source Form (hidden) --}}
+                <div id="source-form-{{ $ep->id }}" class="hidden mt-3 pl-14">
+                    <p class="text-xs text-gray-500 mb-2">For embed sources (recommended), set Type to "Embed" and enter the iframe URL. For direct MP4/HLS, add required headers.</p>
+                    <form action="{{ route('admin.anime.episodes.sources.store', [$anime, $ep]) }}" method="POST" class="flex flex-wrap items-end gap-2">
+                        @csrf
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">URL *</label>
+                            <input type="url" name="url" placeholder="https://..." required class="w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Quality</label>
+                            <select name="quality" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="360p">360p</option>
+                                <option value="480p">480p</option>
+                                <option value="720p" selected>720p</option>
+                                <option value="1080p">1080p</option>
+                                <option value="4K">4K</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Type</label>
+                            <select name="type" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="embed">Embed (recommended)</option>
+                                <option value="mp4">MP4</option>
+                                <option value="hls">HLS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Lang</label>
+                            <select name="language" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="sub">Sub</option>
+                                <option value="dub">Dub</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Headers (JSON)</label>
+                            <input type="text" name="headers" placeholder='{"Referer":"https://..."}' class="w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono">
+                        </div>
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-lg text-xs font-medium transition text-white">Add</button>
+                    </form>
                 </div>
             </div>
         @empty
@@ -112,4 +185,13 @@
         @endforelse
     </div>
 </div>
+
+@push('scripts')
+<script>
+function toggleSourceForm(episodeId) {
+    const form = document.getElementById('source-form-' + episodeId);
+    form.classList.toggle('hidden');
+}
+</script>
+@endpush
 @endsection

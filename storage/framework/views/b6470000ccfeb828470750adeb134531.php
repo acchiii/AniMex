@@ -3,12 +3,6 @@
 
 <?php $__env->startSection('header-actions'); ?>
 <div class="flex items-center gap-2">
-    <?php if($anime->anilist_id): ?>
-        <form action="<?php echo e(route('admin.anime.import-all-sources', $anime)); ?>" method="POST" onsubmit="return confirm('Import sources for all episodes? This may take a while.')">
-            <?php echo csrf_field(); ?>
-            <button type="submit" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-medium transition">Import All Sources</button>
-        </form>
-    <?php endif; ?>
     <a href="<?php echo e(route('admin.anime.index')); ?>" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm transition">&larr; Back</a>
 </div>
 <?php $__env->stopSection(); ?>
@@ -68,7 +62,21 @@
 
         </h3>
         <?php if($anime->anilist_id): ?>
-            <span class="text-xs text-gray-500">AniList ID: <?php echo e($anime->anilist_id); ?></span>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">AniList ID: <?php echo e($anime->anilist_id); ?></span>
+                <form action="<?php echo e(route('admin.anime.fetch-episode-list', $anime)); ?>" method="POST" class="inline">
+                    <?php echo csrf_field(); ?>
+                    <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                        Fetch Episodes
+                    </button>
+                </form>
+                <form action="<?php echo e(route('admin.anime.import-all-sources', $anime)); ?>" method="POST" class="inline" onsubmit="return confirm('Import sources for ALL episodes without sources? This may take a while.')">
+                    <?php echo csrf_field(); ?>
+                    <button type="submit" class="text-xs bg-green-600 hover:bg-green-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                        Import All Sources
+                    </button>
+                </form>
+            </div>
         <?php endif; ?>
     </div>
 
@@ -89,6 +97,26 @@
                                 <span class="ml-2 text-red-500">No sources</span>
                             <?php endif; ?>
                         </p>
+
+                        
+                        <?php if($ep->sources->isNotEmpty()): ?>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                <?php $__currentLoopData = $ep->sources; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $source): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 text-xs">
+                                        <span class="text-gray-700 dark:text-gray-300"><?php echo e($source->quality); ?></span>
+                                        <span class="text-gray-400">|</span>
+                                        <span class="text-gray-600 dark:text-gray-400"><?php echo e($source->type); ?></span>
+                                        <span class="text-gray-400">|</span>
+                                        <span class="text-gray-600 dark:text-gray-400"><?php echo e($source->language); ?></span>
+                                        <form action="<?php echo e(route('admin.anime.episodes.sources.destroy', [$anime, $ep, $source])); ?>" method="POST" class="inline" onsubmit="return confirm('Delete this source?')">
+                                            <?php echo csrf_field(); ?>
+                                            <?php echo method_field('DELETE'); ?>
+                                            <button type="submit" class="text-red-500 hover:text-red-700 ml-1">&times;</button>
+                                        </form>
+                                    </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <div class="flex items-center gap-1 text-xs">
                         <?php if($ep->is_subbed): ?><span class="text-blue-700 dark:text-blue-400">SUB</span><?php endif; ?>
@@ -96,15 +124,59 @@
                     </div>
                     <div class="flex items-center gap-1">
                         <?php if($anime->anilist_id): ?>
-                            <form action="<?php echo e(route('admin.anime.episodes.import-sources', [$anime, $ep])); ?>" method="POST">
+                            <form action="<?php echo e(route('admin.anime.episodes.import-sources', [$anime, $ep])); ?>" method="POST" class="inline">
                                 <?php echo csrf_field(); ?>
-                                <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium">
-                                    <?php echo e($ep->sources->isEmpty() ? 'Import' : 'Re-import'); ?>
-
+                                <button type="submit" class="text-xs bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                                    Import
                                 </button>
                             </form>
                         <?php endif; ?>
+                        <button onclick="toggleSourceForm(<?php echo e($ep->id); ?>)" class="text-xs bg-gray-600 hover:bg-gray-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
+                            + Source
+                        </button>
                     </div>
+                </div>
+
+                
+                <div id="source-form-<?php echo e($ep->id); ?>" class="hidden mt-3 pl-14">
+                    <p class="text-xs text-gray-500 mb-2">For embed sources (recommended), set Type to "Embed" and enter the iframe URL. For direct MP4/HLS, add required headers.</p>
+                    <form action="<?php echo e(route('admin.anime.episodes.sources.store', [$anime, $ep])); ?>" method="POST" class="flex flex-wrap items-end gap-2">
+                        <?php echo csrf_field(); ?>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">URL *</label>
+                            <input type="url" name="url" placeholder="https://..." required class="w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Quality</label>
+                            <select name="quality" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="360p">360p</option>
+                                <option value="480p">480p</option>
+                                <option value="720p" selected>720p</option>
+                                <option value="1080p">1080p</option>
+                                <option value="4K">4K</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Type</label>
+                            <select name="type" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="embed">Embed (recommended)</option>
+                                <option value="mp4">MP4</option>
+                                <option value="hls">HLS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Lang</label>
+                            <select name="language" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600">
+                                <option value="sub">Sub</option>
+                                <option value="dub">Dub</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-0.5">Headers (JSON)</label>
+                            <input type="text" name="headers" placeholder='{"Referer":"https://..."}' class="w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono">
+                        </div>
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-lg text-xs font-medium transition text-white">Add</button>
+                    </form>
                 </div>
             </div>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
@@ -112,6 +184,15 @@
         <?php endif; ?>
     </div>
 </div>
+
+<?php $__env->startPush('scripts'); ?>
+<script>
+function toggleSourceForm(episodeId) {
+    const form = document.getElementById('source-form-' + episodeId);
+    form.classList.toggle('hidden');
+}
+</script>
+<?php $__env->stopPush(); ?>
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.admin', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\AniMex\resources\views/admin/anime/episodes.blade.php ENDPATH**/ ?>

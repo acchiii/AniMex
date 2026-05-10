@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Anime;
 use App\Models\Episode;
+use App\Models\EpisodeSource;
 use App\Models\Genre;
 use App\Models\Studio;
 use App\Models\Tag;
@@ -264,5 +265,52 @@ class AdminAnimeController extends Controller
     {
         $episode->delete();
         return redirect()->route('admin.anime.episodes', $anime)->with('success', 'Episode deleted successfully.');
+    }
+
+    public function storeSource(Request $request, Anime $anime, Episode $episode)
+    {
+        abort_if($episode->anime_id !== $anime->id, 404);
+
+        $validated = $request->validate([
+            'url' => 'required|url',
+            'quality' => 'required|in:360p,480p,720p,1080p,4K',
+            'type' => 'required|in:mp4,hls,embed',
+            'language' => 'required|in:sub,dub',
+            'label' => 'nullable|string|max:255',
+            'headers' => 'nullable|string',
+        ]);
+
+        $headers = null;
+        if ($request->filled('headers')) {
+            $decoded = json_decode($request->headers, true);
+            if (is_array($decoded)) {
+                $headers = $decoded;
+            }
+        }
+
+        $source = EpisodeSource::create([
+            'episode_id' => $episode->id,
+            'video_server_id' => null,
+            'label' => $validated['label'] ?? $validated['quality'],
+            'quality' => $validated['quality'],
+            'url' => $validated['url'],
+            'headers' => $headers,
+            'type' => $validated['type'],
+            'language' => $validated['language'],
+            'is_active' => true,
+            'sort_order' => $episode->sources()->max('sort_order') + 1,
+        ]);
+
+        return redirect()->route('admin.anime.episodes', $anime)->with('success', 'Source added successfully.');
+    }
+
+    public function destroySource(Anime $anime, Episode $episode, EpisodeSource $source)
+    {
+        abort_if($episode->anime_id !== $anime->id, 404);
+        abort_if($source->episode_id !== $episode->id, 404);
+
+        $source->delete();
+
+        return redirect()->route('admin.anime.episodes', $anime)->with('success', 'Source deleted successfully.');
     }
 }

@@ -9,19 +9,14 @@ use App\Models\EpisodeSource;
 use App\Models\Subtitle;
 use App\Services\AnilistVideoSourceService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class AdminAniAPIController extends Controller
 {
     public function importEpisodeSources(Request $request, Anime $anime, Episode $episode)
     {
         abort_if($episode->anime_id !== $anime->id, 404);
-
-        if (!auth()->check() || !auth()->user()->hasRole('admin')) {
-            abort(403);
-        }
+        abort_if(!auth()->check() || !auth()->user()->hasRole('admin'), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -29,7 +24,7 @@ class AdminAniAPIController extends Controller
         /** @var AnilistVideoSourceService $service */
         $service = app(AnilistVideoSourceService::class);
 
-            $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
+        $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
 
         if (!empty($result['error'])) {
             return redirect()
@@ -63,7 +58,7 @@ class AdminAniAPIController extends Controller
                     'quality' => in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true) ? $quality : '720p',
                     'url' => $url,
                     'headers' => $s['headers'] ?? null,
-                    'type' => (string) ($s['type'] ?? 'hls'),
+                    'type' => (string) ($s['type'] ?? 'mp4'),
                     'language' => (string) ($s['language'] ?? 'sub'),
                     'is_active' => (bool) ($s['is_active'] ?? true),
                     'sort_order' => $sort++,
@@ -132,7 +127,7 @@ class AdminAniAPIController extends Controller
                         'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
                         'url' => $url,
                         'headers' => $s['headers'] ?? null,
-                        'type' => (string) ($s['type'] ?? 'hls'),
+                        'type' => (string) ($s['type'] ?? 'mp4'),
                         'language' => (string) ($s['language'] ?? 'sub'),
                         'is_active' => true,
                         'sort_order' => $sort++,
@@ -166,5 +161,29 @@ class AdminAniAPIController extends Controller
         return redirect()
             ->route('admin.anime.episodes', $anime)
             ->with($errors ? 'warning' : 'success', $message);
+    }
+
+    public function fetchEpisodeList(Request $request, Anime $anime)
+    {
+        abort_if(!auth()->check() || !auth()->user()->hasRole('admin'), 403);
+
+        $anilistId = (int) ($anime->anilist_id ?? 0);
+        abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
+
+        /** @var AnilistVideoSourceService $service */
+        $service = app(AnilistVideoSourceService::class);
+
+        $result = $service->fetchEpisodeList($anilistId, $anime->title);
+
+        if (!empty($result['error'])) {
+            return redirect()
+                ->route('admin.anime.episodes', $anime)
+                ->with('error', 'Failed to fetch episode list: ' . $result['error']);
+        }
+
+        $episodeCount = count($result['episodes'] ?? []);
+        return redirect()
+            ->route('admin.anime.episodes', $anime)
+            ->with('success', "Fetched {$episodeCount} episodes from provider ({$result['provider']}). You can now import sources per episode.");
     }
 }

@@ -23,7 +23,7 @@ export default defineConfig({
         cors: true,
 
         hmr: {
-            host: 'localhost',
+            host: '192.168.100.32',
         },
     },
 

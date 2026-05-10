@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 /** Helper function for auth check */
 function user_check(): bool {
@@ -344,5 +345,183 @@ public function stream(string $slug, int $episodeNumber)
             ->paginate(24);
 
         return view('anime.recent', compact('anime'));
+    }
+
+    public function proxySource(Request $request, EpisodeSource $source)
+    {
+        $url = $source->url;
+        $headers = $source->headers ?? [];
+
+        if ($source->type === 'embed') {
+            return redirect()->away($url);
+        }
+
+        $defaultHeaders = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+            'Accept' => '*/*',
+            'Accept-Language' => 'en-US,en;q=0.9',
+        ];
+
+        if (empty($headers['Referer']) && empty($headers['referer'])) {
+            $parsed = parse_url($url);
+            $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+            $defaultHeaders['Referer'] = $origin . '/';
+        }
+
+        $headers = array_merge($defaultHeaders, $headers);
+
+        $client = Http::withHeaders($headers)->timeout(120);
+
+        try {
+            $range = $request->header('Range');
+            $response = $range
+                ? $client->withHeader('Range', $range)->get($url)
+                : $client->get($url);
+
+            if (!$response->ok() && $response->status() !== 206) {
+                return response('', 502);
+            }
+
+            $contentType = $response->header('Content-Type');
+            $contentLength = $response->header('Content-Length');
+            $contentRange = $response->header('Content-Range');
+            $body = $response->body();
+
+            if (empty($body) && !$range) {
+                return response('', 502);
+            }
+        } catch (\Exception $e) {
+            return response('', 502);
+        }
+
+        $isM3u8 = $contentType && str_contains($contentType, 'mpegurl') || str_ends_with($url, '.m3u8');
+
+        if ($isM3u8 && !$range) {
+            $baseUrl = dirname($url);
+            $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
+            $body = preg_replace_callback(
+                '/^(?!#)(.+\.(?:ts|m3u8|mp4|key))(.*)$/m',
+                function ($m) use ($proxySegmentUrl) {
+                    $cleaned = ltrim($m[1], './');
+                    $rest = $m[2] ?? '';
+                    return $proxySegmentUrl . '?path=' . urlencode($cleaned . $rest);
+                },
+                $body
+            );
+            $contentLength = null;
+        }
+
+        $respHeaders = array_filter([
+            'Content-Type' => $contentType ?: 'video/mp4',
+            'Cache-Control' => 'public, max-age=3600',
+            'Access-Control-Allow-Origin' => '*',
+            'Accept-Ranges' => 'bytes',
+        ]);
+
+        if ($contentLength) $respHeaders['Content-Length'] = $contentLength;
+        if ($contentRange) $respHeaders['Content-Range'] = $contentRange;
+        if ($range) $respHeaders['Content-Range'] = $contentRange ?: 'bytes 0-' . ($contentLength - 1) . '/' . $contentLength;
+
+        $status = $range ? 206 : 200;
+
+        return response($body, $status, $respHeaders);
+    }
+
+    private function resolveSegmentUrl(string $baseUrl, string $path): string
+    {
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $query = '';
+        if (($pos = strpos($path, '?')) !== false) {
+            $query = substr($path, $pos);
+            $path = substr($path, 0, $pos);
+        }
+        if (str_starts_with($path, './')) {
+            $path = substr($path, 2);
+        }
+        if (str_starts_with($path, '/')) {
+            $parsed = parse_url($baseUrl);
+            $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+            return $origin . $path . $query;
+        }
+        return rtrim($baseUrl, '/') . '/' . ltrim($path, '/') . $query;
+    }
+
+    public function proxySegment(Request $request, $sourceId)
+    {
+        $source = EpisodeSource::findOrFail($sourceId);
+        $path = $request->query('path');
+        if (!$path) {
+            abort(400, 'Missing path parameter');
+        }
+
+        $baseUrl = dirname($source->url);
+        $segmentUrl = $this->resolveSegmentUrl($baseUrl, $path);
+
+        $storedHeaders = $source->headers ?? [];
+        $defaultHeaders = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+            'Accept' => '*/*',
+            'Accept-Language' => 'en-US,en;q=0.9',
+            'Referer' => $baseUrl . '/',
+        ];
+        if (!empty($storedHeaders['Referer'])) {
+            $defaultHeaders['Referer'] = $storedHeaders['Referer'];
+        } elseif (!empty($storedHeaders['referer'])) {
+            $defaultHeaders['Referer'] = $storedHeaders['referer'];
+        }
+        $headers = array_merge($defaultHeaders, $storedHeaders);
+
+        $client = Http::withHeaders($headers)->timeout(60);
+        $response = $client->get($segmentUrl);
+
+        if (!$response->ok()) {
+            abort(502, 'Segment fetch failed');
+        }
+
+        $contentType = $response->header('Content-Type');
+        $body = $response->body();
+
+        $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($path, '.m3u8');
+
+        // Recursively rewrite relative URLs inside sub-M3U8 playlists
+        if ($isM3u8) {
+            $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
+            $pathDir = dirname($path);
+            $pathPrefix = ($pathDir !== '.' && $pathDir !== '/') ? $pathDir . '/' : '';
+            $body = preg_replace_callback(
+                '/^(?!#)(.+\.(?:ts|m3u8|mp4|key))(.*)$/m',
+                function ($m) use ($proxySegmentUrl, $pathPrefix) {
+                    $matched = $m[1];
+                    $rest = $m[2] ?? '';
+                    if (str_starts_with($matched, 'http://') || str_starts_with($matched, 'https://') || str_starts_with($matched, '/')) {
+                        $fullPath = $matched . $rest;
+                    } else {
+                        $fullPath = $pathPrefix . ltrim($matched, './') . $rest;
+                    }
+                    return $proxySegmentUrl . '?path=' . urlencode($fullPath);
+                },
+                $body
+            );
+            return response($body, 200, [
+                'Content-Type' => 'application/vnd.apple.mpegurl',
+                'Access-Control-Allow-Origin' => '*',
+                'Cache-Control' => 'public, max-age=3600',
+            ]);
+        }
+
+        $stream = $response->toPsrResponse()->getBody();
+
+        return response()->stream(function () use ($stream) {
+            while (!$stream->eof()) {
+                echo $stream->read(8192);
+                flush();
+            }
+        }, 200, [
+            'Content-Type' => $contentType ?: 'video/MP2T',
+            'Cache-Control' => 'public, max-age=3600',
+            'Access-Control-Allow-Origin' => '*',
+        ]);
     }
 }

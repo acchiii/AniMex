@@ -10,8 +10,6 @@ return [
 
     'consumet' => [
         'base_url' => env('CONSUMET_BASE_URL', 'http://localhost:3000'),
-        'provider' => env('CONSUMET_PROVIDER', 'gogoanime'),
-        'fallback_providers' => explode(',', env('CONSUMET_FALLBACK_PROVIDERS', 'zoro,enime')),
     ],
 
     'anipub' => [
