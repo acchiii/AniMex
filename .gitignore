@@ -1,11 +1,11 @@
 /.phpunit.cache
 /node_modules
-/consumet-server/node_modules/
+# /consumet-server/node_modules/
 /public/hot
 /public/storage
 /storage/*.key
 /vendor
-.env
+# .env
 .env.backup
 .env.production
 .phpactor.json

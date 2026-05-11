@@ -1,3 +1,5 @@
+
+
 <?php $__env->startSection('content'); ?>
 <?php
     $coverUrl = $anime->cover_image 

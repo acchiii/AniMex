@@ -13,7 +13,11 @@
                 <video id="video-player" class="w-full h-full <?php if($episode->sources->first()->type === 'embed'): ?> hidden <?php endif; ?>"
                     controls preload="metadata">
                     <?php $__currentLoopData = $episode->subtitles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sub): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <?php $subUrl = parse_url($sub->file_path, PHP_URL_HOST) ? route('proxy.subtitle', ['url' => $sub->file_path]) : $sub->file_path; ?>
+                        <?php
+                            $subParsed = parse_url($sub->file_path);
+                            $isExternal = $subParsed && isset($subParsed['host']) && $subParsed['host'] !== request()->getHost();
+                            $subUrl = $isExternal ? route('proxy.subtitle', ['url' => $sub->file_path]) : $sub->file_path;
+                        ?>
                         <track kind="subtitles" src="<?php echo e($subUrl); ?>" srclang="<?php echo e($sub->language); ?>" label="<?php echo e($sub->label); ?>" <?php if($sub->is_default): ?> default <?php endif; ?>>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </video>
@@ -146,9 +150,12 @@
         $subtitlesData = $episode->subtitles->map(fn($s) => [
             'language' => $s->language,
             'file_path' => $s->file_path,
-            'proxy_path' => parse_url($s->file_path, PHP_URL_HOST)
-                ? $proxySubtitleUrl . '?url=' . urlencode($s->file_path)
-                : $s->file_path,
+            'proxy_path' => (function ($url) use ($proxySubtitleUrl) {
+                $parsed = parse_url($url);
+                return ($parsed && isset($parsed['host']) && $parsed['host'] !== request()->getHost())
+                    ? $proxySubtitleUrl . '?url=' . urlencode($url)
+                    : $url;
+            })($s->file_path),
         ])->values()->all();
     ?>
     <script>
@@ -199,11 +206,14 @@
                         for (const [key, val] of Object.entries(src.headers || {})) {
                             try { xhr.setRequestHeader(key, val); } catch (e) { }
                         }
+                        try {
+                            xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+                        } catch (e) { }
                     },
                     maxBufferLength: 60,
                     maxMaxBufferLength: 300,
                     maxBufferSize: 100 * 1000 * 1000,
-                    maxBufferHole: 0.5,
+                    maxBufferHole: 2,
                     abrEwmaDefaultEstimate: 1000000,
                     abrEwmaFastVoD: 4.0,
                     abrEwmaSlowVoD: 12.0,
@@ -211,7 +221,7 @@
                     capLevelToPlayerSize: true,
                     backbufferLength: 60,
                 });
-                hls.loadSource(proxyUrl);
+                hls.loadSource(src.url);
                 hls.attachMedia(player);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     buildQualitySelector();
@@ -223,19 +233,15 @@
                     console.warn('HLS error:', data.type, data.details, data.fatal);
                     if (data.fatal) {
                         if (data.details === 'manifestLoadError' || data.details === 'levelLoadError') {
-                            if (src.url && src.url.match(/^https?:\/\//)) {
-                                console.warn('Falling back to direct source URL');
-                                hls.loadSource(src.url);
-                                hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                                    player.play().catch(function () {
-                                        playOverlay.classList.remove('hidden');
-                                    });
+                            console.warn('Direct source failed, trying proxy...');
+                            hls.loadSource(proxyUrl);
+                            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                                player.play().catch(function () {
+                                    playOverlay.classList.remove('hidden');
                                 });
-                            } else {
-                                console.error('Source URL is invalid, cannot fallback');
-                            }
-                        } else if (data.details === 'fragParsingError' || data.details === 'bufferStalledError') {
-                            console.warn('Fatal error, restarting load');
+                            });
+                        } else if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
+                            console.warn('Buffer error, restarting load...');
                             hls.startLoad();
                         }
                     }

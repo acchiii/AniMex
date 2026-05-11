@@ -72,12 +72,6 @@ Visit `http://127.0.0.1:8000`
 └── public/                 # Public assets
 ```
 
-## Default Data
-
-The seeder includes:
-- 15 anime studios
-- 18 genres
-- 40 anime titles with cover images and episodes
 
 ## License
 

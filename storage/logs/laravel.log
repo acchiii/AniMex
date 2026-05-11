@@ -9,3 +9,21 @@
 [2026-05-11 08:02:57] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":166610,"episode":1,"used_title":"マッシュル-MASHLE- 神覚者候補選抜試験編","error":"Watch endpoint returned 404"} 
 [2026-05-11 08:03:00] local.WARNING: On-the-fly source fetch failed {"anime":6,"episode":54,"titles":["Mashle: Shinkakusha Kouho Senbatsu Shiken-hen","Mashle: Magic and Muscles - The Divine Visionary Candidate Exam Arc","マッシュル-MASHLE- 神覚者候補選抜試験編"],"error":"No sources found for AniList ID 166610, episode 1"} 
 [2026-05-11 08:03:20] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":151801,"episode":11,"used_title":"Mashle"} 
+[2026-05-11 11:54:36] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":166610,"episode":3,"used_title":"Mashle: Shinkakusha Kouho Senbatsu Shiken-hen","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:54:58] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":166610,"episode":3,"used_title":"Mashle: Magic and Muscles - The Divine Visionary Candidate Exam Arc","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:55:15] local.ERROR: Maximum execution time of 60 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 60 seconds exceeded at C:/xampp/htdocs/AniMex/vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php:695)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-11 11:56:07] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151801,"episode":2,"used_title":"Mashle","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:56:11] local.INFO: AnilistVideoSource: Found sources via AniPub {"anilist_id":151801,"episode":2,"used_title":"Mashle"} 
+[2026-05-11 11:58:47] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":2,"used_title":"Tsue to Tsurugi no Wistoria Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:58:55] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":2,"used_title":"Wistoria: Wand and Sword Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:59:03] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":2,"used_title":"杖と剣のウィストリア Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 11:59:05] local.WARNING: On-the-fly source fetch failed {"anime":2,"episode":14,"titles":["Tsue to Tsurugi no Wistoria Season 2","Wistoria: Wand and Sword Season 2","杖と剣のウィストリア Season 2"],"error":"No sources found for AniList ID 182300, episode 2"} 
+[2026-05-11 11:59:37] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":151807,"episode":1,"used_title":"Ore dake Level Up na Ken"} 
+[2026-05-11 11:59:37] local.WARNING: Filtered out malformed source URL {"url":"https://srv31.sakana.streampeaker.org/DDL/ANIME/OreDakeLevelUpNaKen/01/playlist.m3u8.replace(playlist.m3u8 thumbnails.vtt)"} 
+[2026-05-11 12:25:14] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151807,"episode":11,"used_title":"Ore dake Level Up na Ken","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:25:28] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151807,"episode":11,"used_title":"Solo Leveling","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:25:35] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151807,"episode":11,"used_title":"俺だけレベルアップな件","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:25:37] local.WARNING: On-the-fly source fetch failed {"anime":3,"episode":27,"titles":["Ore dake Level Up na Ken","Solo Leveling","俺だけレベルアップな件"],"error":"No sources found for AniList ID 151807, episode 11"} 
