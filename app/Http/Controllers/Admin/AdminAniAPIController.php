@@ -16,7 +16,7 @@ class AdminAniAPIController extends Controller
     public function importEpisodeSources(Request $request, Anime $anime, Episode $episode)
     {
         abort_if($episode->anime_id !== $anime->id, 404);
-        abort_if(!auth()->check() || !auth()->user()->hasRole('admin'), 403);
+        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -87,7 +87,7 @@ class AdminAniAPIController extends Controller
 
     public function importAllEpisodeSources(Request $request, Anime $anime)
     {
-        abort_if(!auth()->check() || !auth()->user()->hasRole('admin'), 403);
+        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -165,7 +165,7 @@ class AdminAniAPIController extends Controller
 
     public function fetchEpisodeList(Request $request, Anime $anime)
     {
-        abort_if(!auth()->check() || !auth()->user()->hasRole('admin'), 403);
+        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -181,9 +181,67 @@ class AdminAniAPIController extends Controller
                 ->with('error', 'Failed to fetch episode list: ' . $result['error']);
         }
 
-        $episodeCount = count($result['episodes'] ?? []);
+        $episodes = $result['episodes'] ?? [];
+
+        $created = 0;
+        $updated = 0;
+
+        foreach ($episodes as $ep) {
+            $number = (int) ($ep['number'] ?? 0);
+            if ($number <= 0) continue;
+
+            $existing = $anime->episodes()->where('number', $number)->first();
+
+            $data = [
+                'title' => $ep['title'] ?? null,
+                'synopsis' => $ep['description'] ?? null,
+                'thumbnail' => $ep['image'] ?? null,
+                'aired_at' => isset($ep['releaseDate']) && $ep['releaseDate'] ? $ep['releaseDate'] : null,
+            ];
+
+            if ($existing) {
+                $dirty = false;
+                if (!$existing->title && $data['title']) {
+                    $existing->title = $data['title'];
+                    $dirty = true;
+                }
+                if (!$existing->synopsis && $data['synopsis']) {
+                    $existing->synopsis = $data['synopsis'];
+                    $dirty = true;
+                }
+                if (!$existing->thumbnail && $data['thumbnail']) {
+                    $existing->thumbnail = $data['thumbnail'];
+                    $dirty = true;
+                }
+                if (!$existing->aired_at && $data['aired_at']) {
+                    $existing->aired_at = $data['aired_at'];
+                    $dirty = true;
+                }
+                if ($dirty) {
+                    $existing->save();
+                    $updated++;
+                }
+            } else {
+                $episode = new Episode();
+                $episode->anime_id = $anime->id;
+                $episode->number = $number;
+                $episode->title = $data['title'];
+                $episode->synopsis = $data['synopsis'];
+                $episode->thumbnail = $data['thumbnail'];
+                $episode->aired_at = $data['aired_at'];
+                $episode->save();
+                $created++;
+            }
+        }
+
+        $total = count($episodes);
+        $parts = [];
+        if ($created > 0) $parts[] = "{$created} created";
+        if ($updated > 0) $parts[] = "{$updated} updated";
+        $parts[] = "{$total} total from provider ({$result['provider']})";
+
         return redirect()
             ->route('admin.anime.episodes', $anime)
-            ->with('success', "Fetched {$episodeCount} episodes from provider ({$result['provider']}). You can now import sources per episode.");
+            ->with('success', 'Episodes synced: ' . implode(', ', $parts) . '.');
     }
 }

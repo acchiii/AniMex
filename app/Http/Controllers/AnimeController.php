@@ -403,53 +403,69 @@ public function stream(string $slug, int $episodeNumber)
         }
 
         $headers = array_merge($defaultHeaders, $headers);
-
-        $client = Http::withHeaders($headers)->timeout(120);
+        $client = Http::withHeaders($headers)->timeout(30);
 
         try {
             $range = $request->header('Range');
-            $response = $range
-                ? $client->withHeader('Range', $range)->get($url)
-                : $client->get($url);
 
-            if (!$response->ok() && $response->status() !== 206) {
-                return response('', 502);
+            $psrResponse = $client->send('GET', $url, [
+                'headers' => $range ? ['Range' => $range] : [],
+                'stream' => true,
+            ])->toPsrResponse();
+
+            $status = $psrResponse->getStatusCode();
+            if ($status < 200 || $status >= 300) {
+                if ($status !== 206) {
+                    return response('', 502);
+                }
             }
 
-            $contentType = $response->header('Content-Type');
-            $contentLength = $response->header('Content-Length');
-            $contentRange = $response->header('Content-Range');
-            $body = $response->body();
+            $contentType = $psrResponse->getHeaderLine('Content-Type');
+            $contentLength = $psrResponse->getHeaderLine('Content-Length');
+            $contentRange = $psrResponse->getHeaderLine('Content-Range');
+            $bodyStream = $psrResponse->getBody();
 
-            if (empty($body) && !$range) {
-                return response('', 502);
+            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8');
+
+            if ($isM3u8 && !$range) {
+                $body = $bodyStream->getContents();
+                if (empty($body)) {
+                    return response('', 502);
+                }
+                $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
+                $body = $this->rewriteM3u8Urls($body, $proxySegmentUrl, $url);
+                $contentLength = null;
+
+                $respHeaders = array_filter([
+                    'Content-Type' => 'application/vnd.apple.mpegurl',
+                    'Cache-Control' => 'public, max-age=3600',
+                    'Access-Control-Allow-Origin' => '*',
+                    'Accept-Ranges' => 'bytes',
+                ]);
+                return response($body, 200, $respHeaders);
             }
+
+            $respHeaders = array_filter([
+                'Content-Type' => $contentType ?: 'video/mp4',
+                'Cache-Control' => 'public, max-age=3600',
+                'Access-Control-Allow-Origin' => '*',
+                'Accept-Ranges' => 'bytes',
+            ]);
+            if ($contentLength) $respHeaders['Content-Length'] = $contentLength;
+            if ($contentRange) $respHeaders['Content-Range'] = $contentRange;
+
+            $responseStatus = $range ? 206 : 200;
+
+            return response()->stream(function () use ($bodyStream) {
+                while (!$bodyStream->eof()) {
+                    echo $bodyStream->read(8192);
+                    flush();
+                }
+                $bodyStream->close();
+            }, $responseStatus, $respHeaders);
         } catch (\Exception $e) {
             return response('', 502);
         }
-
-        $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8');
-
-        if ($isM3u8 && !$range) {
-            $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
-            $body = $this->rewriteM3u8Urls($body, $proxySegmentUrl, $url);
-            $contentLength = null;
-        }
-
-        $respHeaders = array_filter([
-            'Content-Type' => $contentType ?: 'video/mp4',
-            'Cache-Control' => 'public, max-age=3600',
-            'Access-Control-Allow-Origin' => '*',
-            'Accept-Ranges' => 'bytes',
-        ]);
-
-        if ($contentLength) $respHeaders['Content-Length'] = $contentLength;
-        if ($contentRange) $respHeaders['Content-Range'] = $contentRange;
-        if ($range) $respHeaders['Content-Range'] = $contentRange ?: 'bytes 0-' . ($contentLength - 1) . '/' . $contentLength;
-
-        $status = $range ? 206 : 200;
-
-        return response($body, $status, $respHeaders);
     }
 
     private function rewriteM3u8Urls(string $body, string $proxySegmentUrl, string $originalUrl): string
@@ -480,6 +496,15 @@ public function stream(string $slug, int $episodeNumber)
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
                 return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+            },
+            $body
+        );
+
+        $body = preg_replace_callback(
+            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
+            function ($m) use ($proxySegmentUrl) {
+                $uri = $m[3];
+                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri);
             },
             $body
         );
@@ -549,50 +574,58 @@ public function stream(string $slug, int $episodeNumber)
         }
         $headers = array_merge($defaultHeaders, $storedHeaders);
 
-        $client = Http::withHeaders($headers)->timeout(60);
-        $response = $client->get($segmentUrl);
+        try {
+            $psrResponse = Http::withHeaders($headers)
+                ->timeout(30)
+                ->send('GET', $segmentUrl, ['stream' => true])
+                ->toPsrResponse();
 
-        if (!$response->ok()) {
-            abort(502, 'Segment fetch failed');
-        }
+            if ($psrResponse->getStatusCode() < 200 || $psrResponse->getStatusCode() >= 300) {
+                abort(502, 'Segment fetch failed with status ' . $psrResponse->getStatusCode());
+            }
 
-        $contentType = $response->header('Content-Type');
-        $body = $response->body();
+            $contentType = $psrResponse->getHeaderLine('Content-Type');
+            $bodyStream = $psrResponse->getBody();
 
-        if (empty($body)) {
-            abort(502, 'Empty segment response');
-        }
+            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($path, '.m3u8');
 
-        $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($path, '.m3u8');
+            if ($isM3u8) {
+                $body = $bodyStream->getContents();
+                if (empty($body)) {
+                    abort(502, 'Empty playlist response');
+                }
+                $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
+                $body = $this->rewriteM3u8UrlsForSubPlaylist($body, $proxySegmentUrl, $path, $baseUrl);
+                return response($body, 200, [
+                    'Content-Type' => 'application/vnd.apple.mpegurl',
+                    'Access-Control-Allow-Origin' => '*',
+                    'Cache-Control' => 'public, max-age=3600',
+                ]);
+            }
 
-        if ($isM3u8) {
-            $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
-            $body = $this->rewriteM3u8UrlsForSubPlaylist($body, $proxySegmentUrl, $path, $baseUrl);
-            return response($body, 200, [
-                'Content-Type' => 'application/vnd.apple.mpegurl',
-                'Access-Control-Allow-Origin' => '*',
+            if ($contentType) {
+                $lower = strtolower($contentType);
+                if (str_contains($lower, 'text/html') || str_contains($lower, 'text/plain')) {
+                    abort(502, 'Invalid segment content type: ' . $contentType);
+                }
+            }
+
+            $respHeaders = [
+                'Content-Type' => $contentType ?: 'video/MP2T',
                 'Cache-Control' => 'public, max-age=3600',
-            ]);
+                'Access-Control-Allow-Origin' => '*',
+            ];
+
+            return response()->stream(function () use ($bodyStream) {
+                while (!$bodyStream->eof()) {
+                    echo $bodyStream->read(8192);
+                    flush();
+                }
+                $bodyStream->close();
+            }, 200, $respHeaders);
+        } catch (\Exception $e) {
+            abort(502, 'Segment fetch error: ' . $e->getMessage());
         }
-
-        if ($contentType && !str_contains($contentType, 'video') && !str_contains($contentType, 'octet-stream') && !str_contains($contentType, 'binary')) {
-            if (str_contains($contentType, 'text') || str_contains($contentType, 'html')) {
-                abort(502, 'Invalid segment content type: ' . $contentType);
-            }
-        }
-
-        $stream = $response->toPsrResponse()->getBody();
-
-        return response()->stream(function () use ($stream) {
-            while (!$stream->eof()) {
-                echo $stream->read(8192);
-                flush();
-            }
-        }, 200, [
-            'Content-Type' => $contentType ?: 'video/MP2T',
-            'Cache-Control' => 'public, max-age=3600',
-            'Access-Control-Allow-Origin' => '*',
-        ]);
     }
 
     private function rewriteM3u8UrlsForSubPlaylist(string $body, string $proxySegmentUrl, string $currentPath, string $baseUrl): string
@@ -627,6 +660,15 @@ public function stream(string $slug, int $episodeNumber)
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
                 return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+            },
+            $body
+        );
+
+        $body = preg_replace_callback(
+            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
+            function ($m) use ($proxySegmentUrl) {
+                $uri = $m[3];
+                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri);
             },
             $body
         );

@@ -59,7 +59,9 @@ class AnilistVideoSourceService
             }
 
             $resp = Http::withHeaders(['Accept' => 'application/json'])
-                ->timeout(60)
+                ->connectTimeout(3)
+                ->timeout(10)
+                ->retry(1, 100)
                 ->get($url);
 
             if (!$resp->ok()) {
@@ -89,7 +91,9 @@ class AnilistVideoSourceService
             }
 
             $infoResp = Http::withHeaders(['Accept' => 'application/json'])
-                ->timeout(60)
+                ->connectTimeout(3)
+                ->timeout(10)
+                ->retry(1, 100)
                 ->get($infoUrl);
 
             if (!$infoResp->ok()) {
@@ -113,7 +117,9 @@ class AnilistVideoSourceService
             }
 
             $watchResp = Http::withHeaders(['Accept' => 'application/json'])
-                ->timeout(30)
+                ->connectTimeout(3)
+                ->timeout(10)
+                ->retry(1, 100)
                 ->get("{$this->consumetBaseUrl}/meta/anilist/watch/" . urlencode($episodeId));
 
             if (!$watchResp->ok()) {
@@ -170,6 +176,7 @@ class AnilistVideoSourceService
     private function findAnipubId(string $title): int
     {
         $findResp = Http::withHeaders(['Accept' => 'application/json'])
+            ->connectTimeout(3)
             ->timeout(10)
             ->get("{$this->anipubBaseUrl}/api/find/" . urlencode($title));
 
@@ -181,6 +188,7 @@ class AnilistVideoSourceService
         }
 
         $searchResp = Http::withHeaders(['Accept' => 'application/json'])
+            ->connectTimeout(3)
             ->timeout(10)
             ->get("{$this->anipubBaseUrl}/api/search/" . urlencode($title));
 
@@ -225,7 +233,8 @@ class AnilistVideoSourceService
             }
 
             $streamResp = Http::withHeaders(['Accept' => 'application/json'])
-                ->timeout(15)
+                ->connectTimeout(3)
+                ->timeout(10)
                 ->get("{$this->anipubBaseUrl}/v1/api/details/{$anipubId}");
 
             if (!$streamResp->ok()) {

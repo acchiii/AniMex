@@ -95,7 +95,7 @@
                         <div class="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center text-sm font-medium flex-shrink-0 text-gray-900 dark:text-gray-100">{{ $ep->number }}</div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium truncate">{{ $ep->title ?: 'Episode ' . $ep->number }}</p>
-                            <p class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ $ep->anime->title_english ?: $ep->anime->title }}</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 truncate">{{ optional($ep->anime)->title_english ?: optional($ep->anime)->title }}</p>
                         </div>
                     </div>
                 @empty

@@ -99,17 +99,14 @@
         <?php if($anime->episodes->count()): ?>
             <div class="mt-8">
                 <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Episodes</h2>
-                <div class="space-y-2">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                     <?php $__currentLoopData = $anime->episodes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $episode): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <a href="<?php echo e(route('anime.stream', ['slug' => $anime->slug, 'episodeNumber' => $episode->number])); ?>" 
-                            class="flex items-center gap-4 p-3 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">
-                            <span class="text-gray-500 dark:text-gray-400 w-12">EP <?php echo e($episode->number); ?></span>
-                            <span class="flex-1 text-gray-900 dark:text-white"><?php echo e($episode->title); ?></span>
-                            <?php if($episode->is_filler): ?>
-                                <span class="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded">Filler</span>
-                            <?php endif; ?>
+                            class="flex flex-col items-center gap-1 p-2 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition text-center <?php if($episode->is_filler): ?> ring-1 ring-yellow-600 <?php endif; ?>">
+                            <span class="text-xs font-medium text-gray-900 dark:text-white leading-tight truncate w-full"><?php echo e($episode->title ?: 'Episode ' . $episode->number); ?></span>
+                            <span class="text-[10px] text-gray-500 dark:text-gray-400">EP <?php echo e($episode->number); ?></span>
                             <?php if($episode->sources->count()): ?>
-                                <span class="text-xs text-gray-400 dark:text-gray-500"><?php echo e($episode->sources->count()); ?> sources</span>
+                                <span class="text-[10px] text-green-600 dark:text-green-400"><?php echo e($episode->sources->count()); ?></span>
                             <?php endif; ?>
                         </a>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

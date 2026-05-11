@@ -67,6 +67,299 @@ class AnimeSeeder extends Seeder
         return $images[$seed] ?? 'https://cdn.myanimelist.net/images/anime/1948/120625.jpg';
     }
 
+    private function getEpisodeList(string $title, int $episodesCount): array
+    {
+        $lists = [
+            'Attack on Titan: The Final Season' => [
+                ['title' => 'The Other Side of the Sea', 'number' => 1, 'synopsis' => 'Eren and his comrades face the sea for the first time, but their joy is short-lived as they realize the enemy lies beyond the ocean.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Dark Tunnels', 'number' => 2, 'synopsis' => 'The Survey Corps infiltrates Marley territory, encountering new threats and allies alike in enemy lands.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Door of Hope', 'number' => 3, 'synopsis' => 'As tensions escalate, the warriors of Marley prepare for battle while the Survey Corps executes their plan.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'From One Hand to Another', 'number' => 4, 'synopsis' => 'The fate of Paradis rests on a delicate negotiation as old enemies are forced to consider a truce.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Declaration of War', 'number' => 5, 'synopsis' => 'Willy Tybur delivers a shocking declaration of war against Paradis, setting the stage for an epic confrontation.', 'duration' => 1560, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Jujutsu Kaisen Season 2' => [
+                ['title' => 'Hidden Inventory', 'number' => 1, 'synopsis' => 'Gojo Satoru and Geto Suguru are tasked with protecting a young girl named Riko Amanai, the Star Plasma Vessel.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Hidden Inventory 2', 'number' => 2, 'synopsis' => 'The mission to protect Riko continues as Gojo and Geto face off against a skilled assassin.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Hidden Inventory 3', 'number' => 3, 'synopsis' => 'Gojo unleashes his full power to protect his friends, but the cost of victory may be too high.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Premature Death', 'number' => 4, 'synopsis' => 'Years later, Gojo has become the strongest sorcerer alive, but a new threat emerges from the shadows.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Premature Death 2', 'number' => 5, 'synopsis' => 'The Shibuya Incident begins as chaos engulfs the streets of Tokyo, testing every sorcerer to their limits.', 'duration' => 1560, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Demon Slayer: Kimetsu no Yaiba' => [
+                ['title' => 'Cruelty', 'number' => 1, 'synopsis' => 'Tanjiro Kamado, a kind-hearted boy, returns from selling charcoal to find his family slaughtered by a demon, with his sister Nezuko transformed into one.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Trainer Sakonji Urokodaki', 'number' => 2, 'synopsis' => 'Tanjiro seeks out the legendary demon slayer Sakonji Urokodaki to train him for the Final Selection exam.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Sabito and Makomo', 'number' => 3, 'synopsis' => 'Under Urokodaki\'s harsh training, Tanjiro meets two mysterious figures who help him master water breathing techniques.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Final Selection', 'number' => 4, 'synopsis' => 'Tanjiro participates in the Final Selection exam, a deadly test where survival means becoming a true demon slayer.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'My Own Steel', 'number' => 5, 'synopsis' => 'Tanjiro receives his Nichirin sword and embarks on his first mission as a demon slayer.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Solo Leveling' => [
+                ['title' => 'I\'m Used to It', 'number' => 1, 'synopsis' => 'Sung Jinwoo, the weakest hunter, struggles to survive in low-rank dungeons to pay for his mother\'s medical bills.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'If I Had One More Chance', 'number' => 2, 'synopsis' => 'Trapped in a double dungeon with his party, Jinwoo faces a terrifying statue that tests the will of all who enter.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A QR Code', 'number' => 3, 'synopsis' => 'Jinwoo discovers he has become a Player, gaining a mysterious quest system that allows him to level up like a game character.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'I\'ve Gotta Get Stronger', 'number' => 4, 'synopsis' => 'Jinwoo takes on daily quests to increase his strength, quickly surpassing his former limits.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Pretty Good Deal', 'number' => 5, 'synopsis' => 'Jinwoo enters an instant dungeon and faces a formidable boss, learning the true potential of his new abilities.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Frieren: Beyond Journey\'s End' => [
+                ['title' => 'The End of the Journey', 'number' => 1, 'synopsis' => 'After the hero party defeats the Demon King, the elf mage Frieren watches her companions age and pass away, reflecting on her immortality.', 'duration' => 1500, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'It Didn\'t Have to Be Magic', 'number' => 2, 'synopsis' => 'Frieren takes on an apprentice, Fern, and begins a new journey to understand the hearts of humans.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Killing Magic', 'number' => 3, 'synopsis' => 'Frieren teaches Fern the ways of magic while they travel north, encountering remnants of the demon army.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Land Where Souls Rest', 'number' => 4, 'synopsis' => 'Frieren and Fern visit a village where the dead cannot find peace, forcing Frieren to confront her past.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Phantoms of the Dead', 'number' => 5, 'synopsis' => 'A demon disguised as a friend from Frieren\'s past tests the party\'s resolve and trust.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Spy x Family Season 2' => [
+                ['title' => 'Follow Mama and Papa', 'number' => 1, 'synopsis' => 'Anya decides to follow her parents to see what they do on their secret missions, leading to chaotic fun.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Bond\'s Strategy to Stay Alive', 'number' => 2, 'synopsis' => 'Bond the dog has a vision of a future where the Forger family is in grave danger, and he must act to save them.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Mission and Family', 'number' => 3, 'synopsis' => 'Loid faces a difficult choice between completing his mission and protecting his fake family.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Pastry of Knowledge', 'number' => 4, 'synopsis' => 'Anya enters a baking competition at school, unaware that the stakes involve a top-secret intelligence operation.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Hand That Connects to Tomorrow', 'number' => 5, 'synopsis' => 'Yor struggles to balance her assassin duties and her role as Anya\'s mother when Anya falls ill.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Chainsaw Man' => [
+                ['title' => 'Dog & Chainsaw', 'number' => 1, 'synopsis' => 'Denji lives a miserable life as a devil hunter, forced to pay off his father\'s debt. His only friend is his chainsaw devil, Pochita.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Arrival in Tokyo', 'number' => 2, 'synopsis' => 'After merging with Pochita, Denji becomes Chainsaw Man and joins the Public Safety Devil Hunters.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Meowy\'s Whereabouts', 'number' => 3, 'synopsis' => 'Denji teams up with Power to rescue her cat, facing a powerful devil in an abandoned building.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Rescue', 'number' => 4, 'synopsis' => 'The team faces a new threat as a powerful devil attacks, testing Denji\'s abilities and resolve.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Gun Devil', 'number' => 5, 'synopsis' => 'A glimpse of the mysterious Gun Devil sends shockwaves through the world, and Denji learns the price of his new powers.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'My Hero Academia Season 7' => [
+                ['title' => 'Vestiges', 'number' => 1, 'synopsis' => 'The final war arc begins as heroes across Japan mobilize for the decisive battle against the Paranormal Liberation Front.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Sky-High Leap', 'number' => 2, 'synopsis' => 'Deku and the remaining heroes launch a desperate offensive against All For One and Shigaraki.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Two Flashfires', 'number' => 3, 'synopsis' => 'Shoto Todoroki faces Dabi in a heated battle that reveals the truth about their family\'s dark past.', 'duration' => 1500, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Story of How We All Became Heroes', 'number' => 4, 'synopsis' => 'Class 1-A fights together as a unit, showcasing how much they have grown since their first day at UA.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Final Battle', 'number' => 5, 'synopsis' => 'Deku confronts Shigaraki in a battle that will determine the fate of hero society itself.', 'duration' => 1560, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Violet Evergarden' => [
+                ['title' => '"I Love You" and Auto Memory Dolls', 'number' => 1, 'synopsis' => 'Violet Evergarden, a former soldier, begins working as an Auto Memory Doll at the CH Postal Company, writing letters for others.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Never Coming Back', 'number' => 2, 'synopsis' => 'Violet takes on her first client, a young girl who wants to write letters to her deceased mother.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'May You Be an Exemplary Auto Memory Doll', 'number' => 3, 'synopsis' => 'Violet struggles to understand emotions as she takes on a new assignment to help a famous playwright.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'You Won\'t Call Me an Idiot Anymore', 'number' => 4, 'synopsis' => 'Violet helps a young princess write love letters to a prince she has never met, learning about romance and politics.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'You Are Like a Caged Bird', 'number' => 5, 'synopsis' => 'A grieving scientist hires Violet to write letters to his deceased daughter, forcing her to confront her own loss.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'One Piece' => [
+                ['title' => 'Romance Dawn', 'number' => 1, 'synopsis' => 'Monkey D. Luffy, a young boy with the power of rubber, sets out to become the Pirate King and find the legendary One Piece treasure.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'That Guy, Straw Hat Luffy', 'number' => 2, 'synopsis' => 'Luffy arrives in a small town and meets the swordsman Roronoa Zoro, whom he recruits as his first crewmate.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Morgan versus Luffy', 'number' => 3, 'synopsis' => 'Luffy and Zoro face off against the corrupt Captain Morgan to save the town and a young girl named Koby.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Luffy\'s Past', 'number' => 4, 'synopsis' => 'Flashbacks reveal Luffy\'s childhood with Shanks and how he gained his Gomu Gomu powers.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Legendary Man', 'number' => 5, 'synopsis' => 'The Straw Hats encounter the infamous pirate captain Buggy the Clown.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Death Note' => [
+                ['title' => 'Rebirth', 'number' => 1, 'synopsis' => 'Genius high school student Light Yagami discovers a supernatural notebook that allows him to kill anyone whose name he writes in it.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Confrontation', 'number' => 2, 'synopsis' => 'The world-famous detective L begins investigating the mysterious deaths of criminals, suspecting a person is behind them.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Dealings', 'number' => 3, 'synopsis' => 'Light meets the shinigami Ryuk and makes a deal with another shinigami named Rem to gain the eyes of a shinigami.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Pursuit', 'number' => 4, 'synopsis' => 'L narrows down his suspect list and begins closing in on Light, using an FBI agent to tail him.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Tactics', 'number' => 5, 'synopsis' => 'Light outmaneuvers L by eliminating the FBI agents tailing him, escalating their deadly game of cat and mouse.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Naruto Shippuden' => [
+                ['title' => 'Homecoming', 'number' => 1, 'synopsis' => 'Naruto returns to the Hidden Leaf Village after two and a half years of training, ready to face new threats.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Akatsuki Makes Its Move', 'number' => 2, 'synopsis' => 'The criminal organization Akatsuki begins capturing Jinchuriki, targeting Naruto and the Nine-Tailed Fox.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Training Results', 'number' => 3, 'synopsis' => 'Kakashi tests Naruto\'s new abilities while Sakura showcases her medical training under Tsunade.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Jinchuriki of the Sand', 'number' => 4, 'synopsis' => 'Gaara, now the Kazekage, faces an attack from the Akatsuki as they attempt to extract the One-Tail from him.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Kazekage\'s Path', 'number' => 5, 'synopsis' => 'Naruto and Sakura rush to save Gaara as Team Guy joins the mission, but Deidara and Sasori prove formidable.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Haikyuu!!' => [
+                ['title' => 'The End and the Beginning', 'number' => 1, 'synopsis' => 'Shoyo Hinata, inspired by a diminutive volleyball player, joins his middle school volleyball club and vows to become great.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The View from the Top', 'number' => 2, 'synopsis' => 'Hinata enters Karasuno High and meets his rival-turned-teammate Tobio Kageyama, whose skills are unmatched.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Chance to Soar', 'number' => 3, 'synopsis' => 'Hinata and Kageyama begin developing their signature quick attack under the watchful eye of their seniors.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Ace\'s Perspective', 'number' => 4, 'synopsis' => 'The team prepares for the Inter-High preliminaries as each player works to improve their individual skills.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Small Giant', 'number' => 5, 'synopsis' => 'Karasuno plays their first practice match against Dateko, facing the infamous Iron Wall defense.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Spirited Away' => [
+                ['title' => 'Spirited Away', 'number' => 1, 'synopsis' => 'During a move to the suburbs, 10-year-old Chihiro wanders into a spirit world and must work at a bathhouse to save her transformed parents.', 'duration' => 7500, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Mob Psycho 100' => [
+                ['title' => 'Self-Proclaimed Psychic: Reigen Arataka ~And Mob~', 'number' => 1, 'synopsis' => 'Shigeo "Mob" Kageyama, a powerful esper, works for con artist Reigen while trying to suppress his emotions and his growing psychic powers.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Doubts About Youth ~The Telepathy Club Appears~', 'number' => 2, 'synopsis' => 'Mob joins the Telepathy Club at school, hoping to find friends who understand his abilities.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'An Invitation ~Simply Put, I Want to Be Popular~', 'number' => 3, 'synopsis' => 'Mob tries to become popular at school and asks Reigen for advice on how to improve himself.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Idiots Only ~The Telepathy Club~', 'number' => 4, 'synopsis' => 'A rival psychic challenges the Telepathy Club, forcing Mob to confront a dangerous esper.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Disciplinary Committee ~The Evil Spirit Base~', 'number' => 5, 'synopsis' => 'Mob faces a powerful evil spirit terrorizing the school, pushing his emotions to the brink.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Bocchi the Rock!' => [
+                ['title' => 'Lonely Bocchi', 'number' => 1, 'synopsis' => 'Hitori Gotoh, a socially anxious girl who dreams of being a musician, is recruited into the Kessoku Band after a chance encounter.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'See You Tomorrow', 'number' => 2, 'synopsis' => 'Bocchi struggles to interact with her new bandmates while preparing for her first live performance.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Check It Out', 'number' => 3, 'synopsis' => 'The Kessoku Band books their first gig, but Bocchi\'s stage fright threatens to derail their debut.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Jumping Girl(s)', 'number' => 4, 'synopsis' => 'Bocchi discovers the power of stage personas to overcome her anxiety during a festival performance.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Place for Light Music', 'number' => 5, 'synopsis' => 'The band searches for a practice space and learns more about each other\'s musical backgrounds.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Kaguya-sama: Love is War' => [
+                ['title' => 'I Will Make You Invite Me / I Will Make You Confess', 'number' => 1, 'synopsis' => 'Kaguya Shinomiya and Miyuki Shirogane engage in psychological warfare, each trying to force the other to confess their love first.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Kaguya Wants to Be Asked / Kaguya Wants to Go Out', 'number' => 2, 'synopsis' => 'Kaguya tries various schemes to get Shirogane to ask her out, with hilarious results.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Shirogane\'s Struggle / Kaguya\'s Unbearable Pressure', 'number' => 3, 'synopsis' => 'Shirogane struggles to focus on his studies while constantly thinking about Kaguya.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Student Council Wants to Be Told / Yu Is Busy', 'number' => 4, 'synopsis' => 'The student council members each pursue their own agendas, with Chika Fujiwara causing delightful chaos.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Kaguya Wants to Be Stopped / Kaguya Is Scared of the Weather', 'number' => 5, 'synopsis' => 'Kaguya and Shirogane are trapped together during a storm, testing the limits of their pride.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Mushoku Tensei: Jobless Reincarnation' => [
+                ['title' => 'Reincarnation', 'number' => 1, 'synopsis' => 'A 34-year-old NEET is reincarnated in a magical world as Rudeus Greyrat, determined to live his second life to the fullest.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Master', 'number' => 2, 'synopsis' => 'Young Rudeus begins his magical training under the tutelage of the mage Roxy Migurdia.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Friend', 'number' => 3, 'synopsis' => 'Rudeus makes his first friend, Sylphiette, a shy girl with elven ears who lives in the nearby forest.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Emergency Family Meeting', 'number' => 4, 'synopsis' => 'Rudeus\'s family faces a crisis that forces them to leave their home and journey to the city.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Young Lady and a Maiden', 'number' => 5, 'synopsis' => 'Rudeus begins his education with a new tutor, the eccentric mage Ghislaine Dedoldia.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Vinland Saga' => [
+                ['title' => 'Somewhere Not Here', 'number' => 1, 'synopsis' => 'Young Thorfinn lives in Iceland with his father Thors, a former warrior who has renounced violence.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Sword', 'number' => 2, 'synopsis' => 'Thorfinn\'s peaceful life is shattered when a group of mercenaries arrive, forcing Thors to confront his violent past.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Troll', 'number' => 3, 'synopsis' => 'After his father\'s death, Thorfinn joins the mercenary band, vowing to kill his father\'s murderer in a proper duel.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'A True Warrior', 'number' => 4, 'synopsis' => 'Thorfinn learns the harsh realities of Viking warfare as he accompanies Askeladd\'s band on raids.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Journey', 'number' => 5, 'synopsis' => 'The mercenaries set sail for England, where greater conflicts and opportunities await them.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Dr. Stone: New World' => [
+                ['title' => 'New World Map', 'number' => 1, 'synopsis' => 'Senku and his kingdom of science set their sights on crossing the ocean to reach the New World.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'To the Other Side of the Sea', 'number' => 2, 'synopsis' => 'The team begins constructing a ship capable of crossing the vast ocean between continents.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'First Contact', 'number' => 3, 'synopsis' => 'Senku and his crew encounter new people on a foreign continent, discovering what civilization has become elsewhere.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Science Warriors', 'number' => 4, 'synopsis' => 'The Kingdom of Science prepares for potential conflict with the new civilization they\'ve discovered.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Treasure Island', 'number' => 5, 'synopsis' => 'Senku realizes the key to reviving all of humanity lies on a mysterious island filled with danger.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Steins;Gate' => [
+                ['title' => 'Turning Point', 'number' => 1, 'synopsis' => 'Self-proclaimed mad scientist Rintaro Okabe accidentally discovers a way to send messages to the past using a microwave.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Time Travel Paranoia', 'number' => 2, 'synopsis' => 'Okabe and his friends experiment with their time machine, unaware of the dangerous consequences that await.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Parallel World Paranoia', 'number' => 3, 'synopsis' => 'The team discovers that changing the past has unintended effects on the present timeline.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Interpreter Rendezvous', 'number' => 4, 'synopsis' => 'A new ally joins the team, bringing expertise in computing that advances their research.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Starmine Rendezvous', 'number' => 5, 'synopsis' => 'The group attends a conference where they encounter a mysterious organization interested in their work.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Fullmetal Alchemist: Brotherhood' => [
+                ['title' => 'Fullmetal Alchemist', 'number' => 1, 'synopsis' => 'Brothers Edward and Alphonse Elric search for the Philosopher\'s Stone to restore their bodies after a failed alchemical transmutation.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The First Day', 'number' => 2, 'synopsis' => 'Edward becomes a State Alchemist and takes on his first mission to investigate a cult in the town of Liore.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'City of Heresy', 'number' => 3, 'synopsis' => 'The Elric brothers uncover a dark secret in Liore as they investigate the mysterious priest Cornello.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'An Alchemist\'s Anguish', 'number' => 4, 'synopsis' => 'The brothers encounter a former State Alchemist who has been twisted by his pursuit of power.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Rain of Sorrows', 'number' => 5, 'synopsis' => 'Edward and Alphonse arrive in the city of Rush Valley, a hub for automail engineers.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Code Geass' => [
+                ['title' => 'The Day a New Demon Was Born', 'number' => 1, 'synopsis' => 'Lelouch vi Britannia, an exiled prince, gains the power of Geass and uses it to begin a rebellion against the Holy Britannian Empire.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The White Knight Awakens', 'number' => 2, 'synopsis' => 'Lelouch acquires a mecha and forms the resistance group the Black Knights, with his childhood friend Suzaku caught in between.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The False Classmate', 'number' => 3, 'synopsis' => 'A new transfer student at school seems suspicious, and Lelouch suspects she might be connected to Britannian intelligence.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'His Name Is Zero', 'number' => 4, 'synopsis' => 'Lelouch, as Zero, leads the Black Knights in their first major operation against the Britannian military.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Princess and the Witch', 'number' => 5, 'synopsis' => 'Lelouch\'s sister Euphemia arrives in Japan, complicating his plans as he tries to keep his identity secret.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Cowboy Bebop' => [
+                ['title' => 'Asteroid Blues', 'number' => 1, 'synopsis' => 'Spike Spiegel and Jet Black, bounty hunters aboard the spaceship Bebop, chase a dangerous criminal through the asteroid belt.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Stray Dog Strut', 'number' => 2, 'synopsis' => 'A data dog containing a fortune in stolen money is sought by criminals and bounty hunters alike.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Honky Tonk Women', 'number' => 3, 'synopsis' => 'Spike crosses paths with his old crew, the Red Dragon Syndicate, and a mysterious woman named Faye Valentine.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Gateway Shuffle', 'number' => 4, 'synopsis' => 'The crew of the Bebop gets caught in a terrorist plot involving a deadly biological weapon.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Ballad of Fallen Angels', 'number' => 5, 'synopsis' => 'Spike confronts his past with the Red Dragon Syndicate in a shootout at a cathedral.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Neon Genesis Evangelion' => [
+                ['title' => 'Angel Attack', 'number' => 1, 'synopsis' => 'Shinji Ikari is summoned to the city of Tokyo-3 by his estranged father and thrust into battle against a mysterious Angel.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Unfamiliar Ceilings', 'number' => 2, 'synopsis' => 'Shinji moves in with Misato Katsuragi and struggles to adjust to life as an Eva pilot.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Phone That Never Rings', 'number' => 3, 'synopsis' => 'Shinji meets the other Eva pilot, the mysterious Rei Ayanami, and learns more about NERV\'s mission.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Rain, After Running Away', 'number' => 4, 'synopsis' => 'Overwhelmed by the pressure, Shinji runs away from NERV, forcing Misato to confront her own past.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Rei, Beyond the Heart', 'number' => 5, 'synopsis' => 'Rei is injured in battle, revealing shocking secrets about her origins and connection to Shinji\'s father.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Tokyo Ghoul' => [
+                ['title' => 'Tragedy', 'number' => 1, 'synopsis' => 'College student Ken Kaneki is attacked by a ghoul and, after a life-saving organ transplant, becomes a half-ghoul himself.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Initiation', 'number' => 2, 'synopsis' => 'Kaneki struggles with his new identity and hunger for human flesh, seeking help from a group of friendly ghouls.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Dove', 'number' => 3, 'synopsis' => 'Kaneki learns about the CCG, the organization that hunts ghouls, and encounters the fearsome investigator Amon.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Supper', 'number' => 4, 'synopsis' => 'Kaneki joins the Anteiku coffee shop and learns to control his ghoul abilities under the guidance of Touka.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Scar', 'number' => 5, 'synopsis' => 'A turf war between ghoul factions threatens Anteiku, forcing Kaneki to confront the violent reality of the ghoul world.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Your Name' => [
+                ['title' => 'Your Name', 'number' => 1, 'synopsis' => 'Two teenagers, a country girl and a Tokyo boy, begin swapping bodies inexplicably and must navigate each other\'s lives.', 'duration' => 6360, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Re:Zero − Starting Life in Another World' => [
+                ['title' => 'The End of the Beginning', 'number' => 1, 'synopsis' => 'Subaru Natsuki is suddenly summoned to a fantasy world where he discovers he has the ability to return to a checkpoint upon death.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Reunion with the Witch', 'number' => 2, 'synopsis' => 'Subaru befriends the half-elf Emilia and the spirit Puck, but a dark fate awaits them in the loot house.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Starting Life from Zero in Another World', 'number' => 3, 'synopsis' => 'After dying repeatedly, Subaru uses his knowledge of future events to try and save everyone.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Happy Roswaal Mansion', 'number' => 4, 'synopsis' => 'Subaru is invited to Roswaal\'s mansion and meets the twin maids, Rem and Ram.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Morning of the Promise', 'number' => 5, 'synopsis' => 'Subaru begins working as a butler in the mansion while trying to uncover a hidden threat.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Hunter x Hunter (2011)' => [
+                ['title' => 'Departure × and × Friends', 'number' => 1, 'synopsis' => 'Gon Freecss leaves his home to become a Hunter and find his missing father, meeting Kurapika and Leorio on the way.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Test × of × the Hunter Exam', 'number' => 2, 'synopsis' => 'Gon, Kurapika, Leorio, and the mysterious Killua begin the challenging Hunter Exam.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Rivals × for × Survival', 'number' => 3, 'synopsis' => 'The first phase of the Hunter Exam tests the applicants\' endurance in a deadly marathon.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Hope × and × Ambition', 'number' => 4, 'synopsis' => 'The second phase of the exam begins with a cooking challenge that pushes applicants to their limits.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Hisoka × Is × Sneaky', 'number' => 5, 'synopsis' => 'A mysterious and dangerous applicant named Hisoka takes an interest in Gon.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Bleach: Thousand-Year Blood War' => [
+                ['title' => 'The Blood Warfare', 'number' => 1, 'synopsis' => 'The Soul Society is attacked by the Wandenreich, a hidden empire of Quincies, throwing the balance of worlds into chaos.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Foundation Stones', 'number' => 2, 'synopsis' => 'Ichigo returns to the Soul Society to find it under siege, learning the true history of the conflict between Quincies and Shinigami.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'March of the StarCross', 'number' => 3, 'synopsis' => 'The Sternritter unleash their full power, decimating the Gotei 13 with their devastating abilities.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Kill the King', 'number' => 4, 'synopsis' => 'Yhwach, the leader of the Wandenreich, marches toward the Royal Palace with the intent of killing the Soul King.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Wrath as a Lightning', 'number' => 5, 'synopsis' => 'Ichigo unlocks new powers as he confronts the overwhelming might of the Sternritter.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Attack on Titan' => [
+                ['title' => 'To You, in 2000 Years', 'number' => 1, 'synopsis' => 'Eren Yeager witnesses the destruction of his hometown by a colossal Titan, setting him on a path of vengeance.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'That Day', 'number' => 2, 'synopsis' => 'The Armored and Colossal Titans breach Wall Maria, causing mass devastation and forcing humanity into retreat.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Dim Light Amid Despair', 'number' => 3, 'synopsis' => 'Eren joins the Survey Corps and trains alongside Mikasa and Armin to fight the Titans.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Night of the Closing Ceremony', 'number' => 4, 'synopsis' => 'The cadets graduate and are assigned to their units, but a new Titan attack threatens their future.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'First Battle', 'number' => 5, 'synopsis' => 'Eren faces the horrors of battle for the first time, losing comrades and discovering a hidden power within himself.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Sword Art Online' => [
+                ['title' => 'The World of Sword Art Online', 'number' => 1, 'synopsis' => 'Players log into Sword Art Online, a virtual reality MMORPG, only to discover they cannot log out and death is permanent.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Beater', 'number' => 2, 'synopsis' => 'Kirito hides his beta tester status and decides to solo the game, but meets the fierce warrior Klein.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Red-Nosed Reindeer', 'number' => 3, 'synopsis' => 'Kirito joins a guild for the first time, but tragedy strikes during a floor boss battle.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Black Swordsman', 'number' => 4, 'synopsis' => 'Kirito gains a reputation as the lone Black Swordsman while helping a young girl named Silica.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Aincrad', 'number' => 5, 'synopsis' => 'Kirito meets Asuna, and the two form an unlikely partnership to conquer the game together.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'One Punch Man' => [
+                ['title' => 'The Strongest Man', 'number' => 1, 'synopsis' => 'Saitama, a hero who can defeat any enemy with a single punch, searches for a worthy opponent to cure his boredom.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Lone Cyborg', 'number' => 2, 'synopsis' => 'Saitama meets Genos, a cyborg seeking revenge against a rampaging villain, and gains a disciple.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Obsessive Scientist', 'number' => 3, 'synopsis' => 'Saitama and Genos take the Hero Association test to become official heroes, with surprising results.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Modern Ninja', 'number' => 4, 'synopsis' => 'Saitama patrols as a Class C hero, dealing with various monsters while frustrating Genos with his lack of ambition.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Ultimate Master', 'number' => 5, 'synopsis' => 'A mysterious organization sends a powerful monster to test the heroes of City Z.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Toradora!' => [
+                ['title' => 'Tiger and Dragon', 'number' => 1, 'synopsis' => 'Ryuuji Takasu meets the fearsome Taiga Aisaka, and the two form an unlikely alliance to pursue their respective crushes.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Ryuuji and Taiga', 'number' => 2, 'synopsis' => 'Ryuuji and Taiga move into the same apartment building, raising eyebrows among their classmates.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Your Song', 'number' => 3, 'synopsis' => 'The school festival approaches, and Taiga finds herself singing on stage to impress Kitamura.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'That Certain Feeling', 'number' => 4, 'synopsis' => 'Taiga and Ryuuji spend time together preparing for the festival, growing closer than they realize.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Kawashima Ami', 'number' => 5, 'synopsis' => 'A new student, Ami Kawashima, joins the class and disrupts the group\'s dynamic with her two-faced personality.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'JoJo\'s Bizarre Adventure' => [
+                ['title' => 'Dio the Invader', 'number' => 1, 'synopsis' => 'In 19th century England, young nobleman Jonathan Joestar faces his adopted brother Dio Brando, whose evil ambitions threaten the Joestar family.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'A Letter from the Past', 'number' => 2, 'synopsis' => 'Jonathan discovers a mysterious stone mask with supernatural powers that Dio plans to use.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Dio\'s Scheme', 'number' => 3, 'synopsis' => 'Dio uses the stone mask to transform into a vampire, beginning the century-spanning conflict between the Joestars and evil.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Overdrive', 'number' => 4, 'synopsis' => 'Jonathan learns Hamon from the master Will A. Zeppeli to combat the vampire threat.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Dark Knights', 'number' => 5, 'synopsis' => 'Dio sends his vampire minions after Jonathan, testing his newfound Hamon abilities.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Made in Abyss' => [
+                ['title' => 'The City of the Great Pit', 'number' => 1, 'synopsis' => 'Riko, a young orphan girl living in the town of Orth, dreams of following in her mother\'s footsteps as a legendary Cave Raider.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Resurrection Festival', 'number' => 2, 'synopsis' => 'Riko discovers a mysterious robot boy named Reg during the festival, and the two form a bond.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Departure', 'number' => 3, 'synopsis' => 'Riko and Reg begin their descent into the Abyss, facing the dangers of the first layer.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Abyss', 'number' => 4, 'synopsis' => 'The pair encounter the unique ecosystem of the Abyss and learn about the curse that afflicts ascending explorers.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Incinerator', 'number' => 5, 'synopsis' => 'Reg unleashes his hidden power to protect Riko from a terrifying creature of the deep.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'The Promised Neverland' => [
+                ['title' => 'Grace Field House', 'number' => 1, 'synopsis' => 'Emma, Norman, and Ray live in a seemingly perfect orphanage until they discover the dark truth: the children are livestock for demons.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Plan', 'number' => 2, 'synopsis' => 'The trio begins formulating an escape plan, carefully testing the boundaries of their prison while avoiding the watchful eye of Mama.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Door', 'number' => 3, 'synopsis' => 'Emma and her friends discover the truth about what lies beyond the gate, confirming their worst fears.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Lie', 'number' => 4, 'synopsis' => 'Norman devises a clever diversion to test the facility\'s security, revealing a traitor among the children.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Plan of the Fortress', 'number' => 5, 'synopsis' => 'The execution date approaches, forcing the children to accelerate their escape plan.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Food Wars! Shokugeki no Soma' => [
+                ['title' => 'An Endless Wasteland', 'number' => 1, 'synopsis' => 'Soma Yukihira enrolls at the elite Totsuki Culinary Academy, where only 10% of students graduate, and challenges the system.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The God Tongue', 'number' => 2, 'synopsis' => 'Soma meets Erina Nakiri, the "God Tongue," whose refined palate can detect the slightest imperfection in any dish.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'That Chef Doesn\'t Smile', 'number' => 3, 'synopsis' => 'Soma faces his first cooking challenge at Totsuki, using his street food background to impress the judges.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'The Goddess of the Fall', 'number' => 4, 'synopsis' => 'Soma takes on a formidable upperclassman in a shokugeki cooking battle to defend his pride.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'The Ice Queen and the Spring Storm', 'number' => 5, 'synopsis' => 'Soma is assigned to work at a luxury hotel, where he must prove himself in a professional kitchen.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Weathering with You' => [
+                ['title' => 'Weathering with You', 'number' => 1, 'synopsis' => 'A runaway high school boy befriends a girl who can control the weather, but her powers come at a devastating price.', 'duration' => 6720, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+            'Dandadan' => [
+                ['title' => 'That\'s How Love Starts, Ya Know!', 'number' => 1, 'synopsis' => 'Momo Ayase believes in ghosts but not aliens, while her classmate Okarun believes in aliens but not ghosts. They bet to prove each other wrong.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'That\'s a Space Alien, Ya Know!', 'number' => 2, 'synopsis' => 'Momo and Okarun discover that both ghosts and aliens are real when they encounter a terrifying alien abduction.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'A Grandson of a Granny, That\'s Who I Am!', 'number' => 3, 'synopsis' => 'Momo\'s grandmother, a powerful psychic, teaches them to harness their newfound supernatural abilities.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+                ['title' => 'Gulp Gulp', 'number' => 4, 'synopsis' => 'The pair face a grotesque spirit that haunts a tunnel, testing their courage and teamwork.', 'duration' => 1380, 'is_subbed' => true, 'is_dubbed' => false],
+                ['title' => 'Can You Even Win with These T**s?', 'number' => 5, 'synopsis' => 'Momo and Okarun encounter another ally in their fight against supernatural threats, expanding their team.', 'duration' => 1440, 'is_subbed' => true, 'is_dubbed' => true],
+            ],
+        ];
+
+        $base = $lists[$title] ?? [];
+        $result = [];
+        for ($i = 1; $i <= $episodesCount; $i++) {
+            $idx = $i - 1;
+            if (isset($base[$idx])) {
+                $result[] = $base[$idx];
+            } else {
+                $result[] = [
+                    'title' => "Episode {$i}",
+                    'number' => $i,
+                    'synopsis' => "Episode {$i} of {$title}.",
+                    'duration' => 1440,
+                    'is_subbed' => true,
+                    'is_dubbed' => ($i % 3 === 0),
+                ];
+            }
+        }
+        return $result;
+    }
+
     public function run(): void
     {
         // Clear existing data
@@ -930,17 +1223,10 @@ class AnimeSeeder extends Seeder
                 }
             }
 
-            $epCount = min($data['episodes_count'], 5);
-            for ($i = 1; $i <= $epCount; $i++) {
-                Episode::create([
-                    'anime_id' => $anime->id,
-                    'title' => "Episode $i",
-                    'number' => $i,
-                    'synopsis' => "Episode $i of {$data['title']}.",
-                    'duration' => 1440,
-                    'is_subbed' => true,
-                    'is_dubbed' => ($i % 3 === 0),
-                ]);
+            $episodeData = $this->getEpisodeList($data['title'], $data['episodes_count']);
+            foreach ($episodeData as $ep) {
+                $ep['anime_id'] = $anime->id;
+                Episode::create($ep);
             }
         }
 
