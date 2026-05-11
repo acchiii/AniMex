@@ -1,3 +1,5 @@
+
+
 <?php $__env->startSection('title', 'Episodes'); ?>
 <?php $__env->startSection('page-title', 'Episodes: ' . ($anime->title_english ?: $anime->title)); ?>
 

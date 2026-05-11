@@ -711,6 +711,10 @@ public function stream(string $slug, int $episodeNumber)
             $headers = [];
             if ($referer = $request->header('Referer')) {
                 $headers['Referer'] = $referer;
+            } else {
+                $parsed = parse_url($url);
+                $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+                $headers['Referer'] = $origin . '/';
             }
             $headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 

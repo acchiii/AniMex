@@ -1,3 +1,5 @@
+
+
 <?php $__env->startSection('title', 'Edit Anime'); ?>
 <?php $__env->startSection('page-title', 'Edit: ' . ($anime->title_english ?: $anime->title)); ?>
 

@@ -7,7 +7,10 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PROVIDER_PRIORITY = ['Hianime', 'AnimePahe', 'AnimeSaturn', 'AnimeUnity', 'AnimeKai', 'KickAssAnime', 'AnimeSama'];
+// Hianime (formerly Gogoanime) — subtitle support, multiple servers, HD, fastest
+// AnimePahe — cleaner videos, smaller file sizes
+// Gogoanime standalone not available in @consumet/extensions@1.8.8
+const PROVIDER_PRIORITY = ['Hianime', 'AnimePahe'];
 
 function createProvider(name) {
   if (!ANIME[name]) {

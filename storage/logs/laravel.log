@@ -27,3 +27,27 @@
 [2026-05-11 12:25:28] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151807,"episode":11,"used_title":"Solo Leveling","error":"Watch endpoint returned 404"} 
 [2026-05-11 12:25:35] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":151807,"episode":11,"used_title":"俺だけレベルアップな件","error":"Watch endpoint returned 404"} 
 [2026-05-11 12:25:37] local.WARNING: On-the-fly source fetch failed {"anime":3,"episode":27,"titles":["Ore dake Level Up na Ken","Solo Leveling","俺だけレベルアップな件"],"error":"No sources found for AniList ID 151807, episode 11"} 
+[2026-05-11 12:35:39] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":1,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:42] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":2,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:44] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":3,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:47] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":4,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:49] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":5,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:52] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":6,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:55] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":7,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:35:59] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":8,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:36:02] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":9,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:36:05] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":10,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:36:08] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":11,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:36:10] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":127230,"episode":12,"used_title":"Chainsaw Man"} 
+[2026-05-11 12:49:42] local.ERROR: Maximum execution time of 120 seconds exceeded {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Maximum execution time of 120 seconds exceeded at C:/xampp/htdocs/AniMex/app/Http/Controllers/AnimeController.php:484)
+[stacktrace]
+#0 {main}
+"} 
+[2026-05-11 12:55:23] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":4,"used_title":"Tsue to Tsurugi no Wistoria Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:55:34] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":4,"used_title":"Wistoria: Wand and Sword Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:55:44] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":182300,"episode":4,"used_title":"杖と剣のウィストリア Season 2","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:55:47] local.WARNING: On-the-fly source fetch failed {"anime":2,"episode":16,"titles":["Tsue to Tsurugi no Wistoria Season 2","Wistoria: Wand and Sword Season 2","杖と剣のウィストリア Season 2"],"error":"No sources found for AniList ID 182300, episode 4"} 
+[2026-05-11 12:56:44] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":176496,"episode":1,"used_title":"Ore dake Level Up na Ken Season 2: Arise from the Shadow","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:57:01] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":176496,"episode":1,"used_title":"Solo Leveling Season 2: Arise from the Shadow","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:57:11] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":176496,"episode":1,"used_title":"俺だけレベルアップな件 Season 2 -Arise from the Shadow-","error":"Watch endpoint returned 404"} 
+[2026-05-11 12:57:13] local.WARNING: On-the-fly source fetch failed {"anime":4,"episode":29,"titles":["Ore dake Level Up na Ken Season 2: Arise from the Shadow","Solo Leveling Season 2: Arise from the Shadow","俺だけレベルアップな件 Season 2 -Arise from the Shadow-"],"error":"No sources found for AniList ID 176496, episode 1"} 

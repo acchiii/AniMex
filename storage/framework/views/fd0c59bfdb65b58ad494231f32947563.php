@@ -1,3 +1,5 @@
+
+
 <?php $__env->startPush('scripts'); ?>
 <?php if(config('services.recaptcha.enabled')): ?>
 <script src="https://www.google.com/recaptcha/api.js?render=<?php echo e(config('services.recaptcha.site_key')); ?>" async defer></script>

@@ -313,10 +313,10 @@
         });
 
         function enableEnglishSubs() {
-            if (player) {
-                for (let track of player.textTracks) {
-                    track.mode = track.language === 'en' ? 'showing' : 'hidden';
-                }
+            if (!player) return;
+            for (let track of player.textTracks) {
+                var isEn = track.language && (track.language === 'en' || track.language.startsWith('en') || track.language === 'eng');
+                track.mode = isEn ? 'showing' : 'hidden';
             }
         }
 
@@ -329,9 +329,10 @@
             player.addEventListener('error', function () {
                 console.warn('Video error:', player.error ? player.error.message : 'unknown', 'code:', player.error ? player.error.code : 'none');
             });
+            player.textTracks.addEventListener('addtrack', enableEnglishSubs);
             player.addEventListener('loadedmetadata', function () {
                 console.log('Video loaded, duration:', player.duration);
-                enableEnglishSubs();
+                setTimeout(enableEnglishSubs, 500);
             });
         }
 
