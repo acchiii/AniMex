@@ -16,4 +16,8 @@ return [
         'base_url' => env('ANIPUB_BASE_URL', 'https://anipub.xyz'),
     ],
 
+    'opensubtitles' => [
+        'api_key' => env('OPENSUBTITLES_API_KEY', ''),
+    ],
+
 ];

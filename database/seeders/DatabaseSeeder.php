@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             StudioSeeder::class,
             GenreSeeder::class,
-            AnimeSeeder::class,
+            // AnimeSeeder::class,
         ]);
     }
 }

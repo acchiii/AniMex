@@ -82,7 +82,7 @@ class AnimeController extends Controller
     {
         $anime = Anime::where('slug', $slug)
             ->with(['genres', 'studio', 'episodes' => function ($q) {
-                $q->orderBy('number');
+                $q->orderBy('number')->withCount('sources');
             }])
             ->firstOrFail();
 
@@ -137,9 +137,12 @@ public function stream(string $slug, int $episodeNumber)
             }
         }
 
+        // All episodes for the episode list
+        $episodes = $anime->episodes()->orderBy('number')->get();
+
         // Next/Previous episodes
-        $nextEpisode = $anime->episodes()->where('number', '>', $episodeNumber)->orderBy('number')->first();
-        $prevEpisode = $anime->episodes()->where('number', '<', $episodeNumber)->orderByDesc('number')->first();
+        $nextEpisode = $episodes->firstWhere('number', '>', $episodeNumber);
+        $prevEpisode = $episodes->firstWhere('number', '<', $episodeNumber);
 
         // Update watch history
         if (auth()->check()) {
@@ -150,7 +153,28 @@ public function stream(string $slug, int $episodeNumber)
             );
         }
 
-        return view('anime.stream', compact('episode', 'anime', 'nextEpisode', 'prevEpisode'));
+        // Fetch English subtitles from OpenSubtitles if missing
+        if ($episode->subtitles->where('language', 'en')->isEmpty()) {
+            /** @var \App\Services\OpenSubtitlesService $os */
+            $os = app(\App\Services\OpenSubtitlesService::class);
+            $osSubs = $os->fetchSubtitles(
+                $anime->title_english ?: $anime->title,
+                $os->guessSeason($episodeNumber),
+                $episodeNumber,
+                'en'
+            );
+            if (!empty($osSubs)) {
+                foreach ($osSubs as $sub) {
+                    \App\Models\Subtitle::firstOrCreate(
+                        ['episode_id' => $episode->id, 'language' => $sub['language']],
+                        $sub
+                    );
+                }
+                $episode->load('subtitles');
+            }
+        }
+
+        return view('anime.stream', compact('episode', 'anime', 'episodes', 'nextEpisode', 'prevEpisode'));
     }
 
     private function fetchSourcesOnTheFly($anime, $episode): ?string
@@ -674,5 +698,59 @@ public function stream(string $slug, int $episodeNumber)
         );
 
         return $body;
+    }
+
+    public function proxySubtitle(Request $request)
+    {
+        $url = $request->query('url');
+        if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
+            abort(400, 'Invalid subtitle URL');
+        }
+
+        try {
+            $headers = [];
+            if ($referer = $request->header('Referer')) {
+                $headers['Referer'] = $referer;
+            }
+            $headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+            $resp = Http::withHeaders($headers)
+                ->timeout(15)
+                ->get($url);
+
+            if (!$resp->successful()) {
+                abort(502, 'Failed to fetch subtitle');
+            }
+
+            $content = $resp->body();
+            $mime = 'text/vtt; charset=utf-8';
+
+            return response($content, 200, [
+                'Content-Type' => $mime,
+                'Content-Length' => strlen($content),
+                'Cache-Control' => 'public, max-age=86400',
+                'Access-Control-Allow-Origin' => '*',
+            ]);
+        } catch (\Exception $e) {
+            abort(502, 'Subtitle proxy error: ' . $e->getMessage());
+        }
+    }
+
+    public function serveSubtitle(string $filename)
+    {
+        $path = storage_path("app/public/subtitles/{$filename}");
+
+        if (!file_exists($path)) {
+            abort(404);
+        }
+
+        $content = file_get_contents($path);
+        $mime = str_ends_with($filename, '.vtt') ? 'text/vtt' : 'text/plain; charset=utf-8';
+
+        return response($content, 200, [
+            'Content-Type' => $mime,
+            'Content-Length' => strlen($content),
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
     }
 }

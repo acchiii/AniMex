@@ -106,8 +106,8 @@
                             class="flex flex-col items-center gap-1 p-2 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition text-center @if($episode->is_filler) ring-1 ring-yellow-600 @endif">
                             <span class="text-xs font-medium text-gray-900 dark:text-white leading-tight truncate w-full">{{ $episode->title ?: 'Episode ' . $episode->number }}</span>
                             <span class="text-[10px] text-gray-500 dark:text-gray-400">EP {{ $episode->number }}</span>
-                            @if($episode->sources->count())
-                                <span class="text-[10px] text-green-600 dark:text-green-400">{{ $episode->sources->count() }}</span>
+                            @if($episode->sources_count)
+                                <span class="text-[10px] text-green-600 dark:text-green-400">{{ $episode->sources_count }}</span>
                             @endif
                         </a>
                     @endforeach

@@ -63,8 +63,8 @@ class AnilistVideoSourceService
         }
 
         $resp = Http::withHeaders(['Accept' => 'application/json'])
-            ->connectTimeout(3)
-            ->timeout(15)
+            ->connectTimeout(5)
+            ->timeout(20)
             ->get($url);
 
         if (!$resp->ok()) {
@@ -119,8 +119,8 @@ class AnilistVideoSourceService
             }
 
             $watchResp = Http::withHeaders(['Accept' => 'application/json'])
-                ->connectTimeout(3)
-                ->timeout(15)
+                ->connectTimeout(5)
+                ->timeout(20)
                 ->get($watchUrl);
 
             if (!$watchResp->ok()) {

@@ -85,4 +85,6 @@ Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])
 Route::get('/proxy/source/{source}', [AnimeController::class, 'proxySource'])->name('proxy.source');
 Route::get('/proxy/segment/{sourceId}', [AnimeController::class, 'proxySegment'])->name('proxy.segment');
 Route::post('/progress', [AnimeController::class, 'saveProgress'])->name('progress.save');
+Route::get('/proxy/subtitle', [AnimeController::class, 'proxySubtitle'])->name('proxy.subtitle');
+Route::get('/subtitles/{filename}', [AnimeController::class, 'serveSubtitle'])->name('subtitle.serve');
 

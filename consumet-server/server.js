@@ -7,7 +7,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PROVIDER_PRIORITY = ['Hianime', 'AnimeSaturn', 'AnimeUnity', 'AnimeKai'];
+const PROVIDER_PRIORITY = ['Hianime', 'AnimePahe', 'AnimeSaturn', 'AnimeUnity', 'AnimeKai', 'KickAssAnime', 'AnimeSama'];
 
 function createProvider(name) {
   if (!ANIME[name]) {
@@ -98,7 +98,7 @@ async function tryProviders(anilistId, titles) {
 
   const allTitles = [...new Set([...searchTitles, ...titles])];
 
-  const PROVIDER_TIMEOUT = 8000;
+  const PROVIDER_TIMEOUT = 14000;
 
   const promises = PROVIDER_PRIORITY.map(async (providerName) => {
     const provider = createProvider(providerName);
@@ -194,7 +194,7 @@ app.get('/meta/anilist/watch/:episodeId', async (req, res) => {
 
     let sources = null;
 
-    const PROVIDER_TIMEOUT = 8000;
+    const PROVIDER_TIMEOUT = 14000;
 
     const tryProvider = async (name) => {
       const provider = createProvider(name);
