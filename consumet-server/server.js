@@ -7,13 +7,22 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PROVIDER_PRIORITY = ['AnimeSaturn', 'AnimeUnity', 'AnimeKai', 'Hianime'];
+const PROVIDER_PRIORITY = ['Hianime', 'AnimeSaturn', 'AnimeUnity', 'AnimeKai'];
 
 function createProvider(name) {
   if (!ANIME[name]) {
     throw new Error(`Unknown provider: ${name}`);
   }
   return new ANIME[name]();
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+    ),
+  ]);
 }
 
 const anilistGraphqlUrl = 'https://graphql.anilist.co';
@@ -33,11 +42,17 @@ async function fetchAnilistMedia(anilistId) {
     }
   `;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   const resp = await fetch(anilistGraphqlUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({ query, variables: { id: anilistId } }),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeoutId);
 
   if (!resp.ok) {
     throw new Error(`AniList API error: ${resp.status}`);
@@ -83,23 +98,40 @@ async function tryProviders(anilistId, titles) {
 
   const allTitles = [...new Set([...searchTitles, ...titles])];
 
-  let lastError = null;
+  const PROVIDER_TIMEOUT = 8000;
 
-  for (const providerName of PROVIDER_PRIORITY) {
-    try {
-      const provider = createProvider(providerName);
-      const found = await searchOnProvider(provider, allTitles);
-      if (found) {
-        const info = await provider.fetchAnimeInfo(found.id);
-        return { provider: providerName, anime: info };
-      }
-    } catch (e) {
-      lastError = e.message;
-      continue;
+  const promises = PROVIDER_PRIORITY.map(async (providerName) => {
+    const provider = createProvider(providerName);
+    const found = await withTimeout(searchOnProvider(provider, allTitles), PROVIDER_TIMEOUT);
+    if (!found) throw new Error(`${providerName}: no match found`);
+    const info = await withTimeout(provider.fetchAnimeInfo(found.id), PROVIDER_TIMEOUT);
+    return { provider: providerName, anime: info };
+  });
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const errors = [];
+
+    for (const promise of promises) {
+      promise
+        .then((result) => {
+          if (!settled) {
+            settled = true;
+            resolve(result);
+          }
+        })
+        .catch((err) => {
+          errors.push(err.message);
+          if (errors.length === promises.length) {
+            reject(
+              new Error(
+                `No provider found for AniList ID ${anilistId}. Errors: ${errors.join('; ')}`
+              )
+            );
+          }
+        });
     }
-  }
-
-  throw new Error(`No provider found for AniList ID ${anilistId}. Last error: ${lastError}`);
+  });
 }
 
 // GET /meta/anilist/info/:id
@@ -162,25 +194,41 @@ app.get('/meta/anilist/watch/:episodeId', async (req, res) => {
 
     let sources = null;
 
+    const PROVIDER_TIMEOUT = 8000;
+
+    const tryProvider = async (name) => {
+      const provider = createProvider(name);
+      const result = await withTimeout(provider.fetchEpisodeSources(episodeId), PROVIDER_TIMEOUT);
+      if (result?.sources?.length > 0) return { providerName: name, sources: result };
+      throw new Error(`${name}: no sources`);
+    };
+
+    const tryAllProviders = async () => {
+      const promises = PROVIDER_PRIORITY.map((name) => tryProvider(name));
+      try {
+        return await Promise.any(promises);
+      } catch {
+        return null;
+      }
+    };
+
     if (providerName) {
       try {
-        const provider = createProvider(providerName);
-        sources = await provider.fetchEpisodeSources(episodeId);
-      } catch (e) {
-        return res.status(502).json({ error: `${providerName} failed: ${e.message}` });
+        const result = await tryProvider(providerName);
+        providerName = result.providerName;
+        sources = result.sources;
+      } catch {
+        const result = await tryAllProviders();
+        if (result) {
+          providerName = result.providerName;
+          sources = result.sources;
+        }
       }
     } else {
-      for (const name of PROVIDER_PRIORITY) {
-        try {
-          const provider = createProvider(name);
-          sources = await provider.fetchEpisodeSources(episodeId);
-          if (sources?.sources?.length > 0) {
-            providerName = name;
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
+      const result = await tryAllProviders();
+      if (result) {
+        providerName = result.providerName;
+        sources = result.sources;
       }
     }
 

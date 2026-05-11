@@ -92,6 +92,8 @@ class AdminAniAPIController extends Controller
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
 
+        set_time_limit(120);
+
         $episodes = $anime->episodes()->whereDoesntHave('sources')->get();
 
         if ($episodes->isEmpty()) {
@@ -193,7 +195,7 @@ class AdminAniAPIController extends Controller
             $existing = $anime->episodes()->where('number', $number)->first();
 
             $data = [
-                'title' => $ep['title'] ?? null,
+                'title' => ($ep['title'] ?? null) ?: "Episode {$number}",
                 'synopsis' => $ep['description'] ?? null,
                 'thumbnail' => $ep['image'] ?? null,
                 'aired_at' => isset($ep['releaseDate']) && $ep['releaseDate'] ? $ep['releaseDate'] : null,

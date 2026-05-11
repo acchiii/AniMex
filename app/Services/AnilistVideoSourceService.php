@@ -10,6 +10,7 @@ class AnilistVideoSourceService
 {
     private string $consumetBaseUrl;
     private string $anipubBaseUrl;
+    private array $infoCache = [];
 
     public function __construct()
     {
@@ -50,25 +51,35 @@ class AnilistVideoSourceService
         ];
     }
 
+    private function fetchInfo(int $anilistId, ?string $animeTitle): array
+    {
+        if (isset($this->infoCache[$anilistId])) {
+            return $this->infoCache[$anilistId];
+        }
+
+        $url = "{$this->consumetBaseUrl}/meta/anilist/info/{$anilistId}";
+        if ($animeTitle) {
+            $url .= '?title=' . urlencode($animeTitle);
+        }
+
+        $resp = Http::withHeaders(['Accept' => 'application/json'])
+            ->connectTimeout(3)
+            ->timeout(15)
+            ->get($url);
+
+        if (!$resp->ok()) {
+            throw new \RuntimeException("Consumet info endpoint returned {$resp->status()}");
+        }
+
+        $data = $resp->json();
+        $this->infoCache[$anilistId] = $data;
+        return $data;
+    }
+
     public function fetchEpisodeList(int $anilistId, ?string $animeTitle = null): array
     {
         try {
-            $url = "{$this->consumetBaseUrl}/meta/anilist/info/{$anilistId}";
-            if ($animeTitle) {
-                $url .= '?title=' . urlencode($animeTitle);
-            }
-
-            $resp = Http::withHeaders(['Accept' => 'application/json'])
-                ->connectTimeout(3)
-                ->timeout(10)
-                ->retry(1, 100)
-                ->get($url);
-
-            if (!$resp->ok()) {
-                return ['error' => "Consumet server returned {$resp->status()}"];
-            }
-
-            $data = $resp->json();
+            $data = $this->fetchInfo($anilistId, $animeTitle);
             $episodes = Arr::get($data, 'episodes', []);
 
             return [
@@ -85,22 +96,7 @@ class AnilistVideoSourceService
     private function tryConsumet(int $anilistId, int $episodeNumber, ?string $animeTitle): array
     {
         try {
-            $infoUrl = "{$this->consumetBaseUrl}/meta/anilist/info/{$anilistId}";
-            if ($animeTitle) {
-                $infoUrl .= '?title=' . urlencode($animeTitle);
-            }
-
-            $infoResp = Http::withHeaders(['Accept' => 'application/json'])
-                ->connectTimeout(3)
-                ->timeout(10)
-                ->retry(1, 100)
-                ->get($infoUrl);
-
-            if (!$infoResp->ok()) {
-                return ['sources' => [], 'subtitles' => [], 'error' => "Info endpoint returned {$infoResp->status()}"];
-            }
-
-            $info = $infoResp->json();
+            $info = $this->fetchInfo($anilistId, $animeTitle);
             $episodes = Arr::get($info, 'episodes', []);
 
             $episodeId = null;
@@ -116,11 +112,16 @@ class AnilistVideoSourceService
                 return ['sources' => [], 'subtitles' => [], 'error' => "Episode {$episodeNumber} not found in provider's list"];
             }
 
+            $provider = Arr::get($info, '_provider');
+            $watchUrl = "{$this->consumetBaseUrl}/meta/anilist/watch/" . urlencode($episodeId);
+            if ($provider) {
+                $watchUrl .= '?provider=' . urlencode($provider);
+            }
+
             $watchResp = Http::withHeaders(['Accept' => 'application/json'])
                 ->connectTimeout(3)
-                ->timeout(10)
-                ->retry(1, 100)
-                ->get("{$this->consumetBaseUrl}/meta/anilist/watch/" . urlencode($episodeId));
+                ->timeout(15)
+                ->get($watchUrl);
 
             if (!$watchResp->ok()) {
                 return ['sources' => [], 'subtitles' => [], 'error' => "Watch endpoint returned {$watchResp->status()}"];
