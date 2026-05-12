@@ -22,8 +22,8 @@
         "DB_CONNECTION": "pgsql",
         "DB_HOST": "ep-lingering-night-apdvfg2o.c-7.us-east-1.aws.neon.tech",
         "DB_PORT": "5432",
-        "DB_DATABASE": "postgresql://neondb_owner:npg_vOoGZsaT0rf9@ep-lingering-night-apdvfg2o.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require",
-        "DB_USERNAME": "animex",
+        "DB_DATABASE": "neondb",
+        "DB_USERNAME": "neondb_owner",
         "DB_PASSWORD": "npg_vOoGZsaT0rf9"
     }
 }
