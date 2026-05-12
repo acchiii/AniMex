@@ -14,6 +14,8 @@ use App\Models\Episode;
 use App\Models\EpisodeSource;
 use App\Models\Subtitle;
 use App\Services\AnilistVideoSourceService;
+use App\Services\JimakuService;
+use App\Services\OpenSubtitlesService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -153,18 +155,33 @@ public function stream(string $slug, int $episodeNumber)
             );
         }
 
-        // Fetch English subtitles from OpenSubtitles if missing
+        // Fetch English subtitles if missing
         if ($episode->subtitles->where('language', 'en')->isEmpty()) {
-            /** @var \App\Services\OpenSubtitlesService $os */
-            $os = app(\App\Services\OpenSubtitlesService::class);
-            $osSubs = $os->fetchSubtitles(
-                $anime->title_english ?: $anime->title,
-                $os->guessSeason($episodeNumber),
-                $episodeNumber,
-                'en'
-            );
-            if (!empty($osSubs)) {
-                foreach ($osSubs as $sub) {
+            $subs = [];
+
+            // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
+            if ($anime->anilist_id && empty($subs)) {
+                $jimaku = app(JimakuService::class);
+                $subs = $jimaku->fetchSubtitles(
+                    (int) $anime->anilist_id,
+                    $episodeNumber,
+                    'en'
+                );
+            }
+
+            // 2. Fall back to OpenSubtitles
+            if (empty($subs)) {
+                $os = app(OpenSubtitlesService::class);
+                $subs = $os->fetchSubtitles(
+                    $anime->title_english ?: $anime->title,
+                    $os->guessSeason($episodeNumber),
+                    $episodeNumber,
+                    'en'
+                );
+            }
+
+            if (!empty($subs)) {
+                foreach ($subs as $sub) {
                     \App\Models\Subtitle::firstOrCreate(
                         ['episode_id' => $episode->id, 'language' => $sub['language']],
                         $sub

@@ -20,4 +20,8 @@ return [
         'api_key' => env('OPENSUBTITLES_API_KEY', ''),
     ],
 
+    'jimaku' => [
+        'api_key' => env('JIMAKU_API_KEY', ''),
+    ],
+
 ];

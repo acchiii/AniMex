@@ -7,10 +7,10 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-// Hianime (formerly Gogoanime) — subtitle support, multiple servers, HD, fastest
+// Hianime (formerly Gogoanime) — best subtitle support, multiple servers, HD, fastest
 // AnimePahe — cleaner videos, smaller file sizes
-// Gogoanime standalone not available in @consumet/extensions@1.8.8
-const PROVIDER_PRIORITY = ['Hianime', 'AnimePahe'];
+// Fallbacks (stable, wide library)
+const PROVIDER_PRIORITY = ['Hianime', 'AnimePahe', 'AnimeSaturn', 'AnimeUnity', 'AnimeKai', 'KickAssAnime', 'AnimeSama'];
 
 function createProvider(name) {
   if (!ANIME[name]) {
@@ -19,11 +19,11 @@ function createProvider(name) {
   return new ANIME[name]();
 }
 
-function withTimeout(promise, ms) {
+function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+      setTimeout(() => reject(new Error(label ? `${label}: Timed out after ${ms}ms` : `Timed out after ${ms}ms`)), ms)
     ),
   ]);
 }
@@ -101,13 +101,13 @@ async function tryProviders(anilistId, titles) {
 
   const allTitles = [...new Set([...searchTitles, ...titles])];
 
-  const PROVIDER_TIMEOUT = 14000;
+  const PROVIDER_TIMEOUT = 20000;
 
   const promises = PROVIDER_PRIORITY.map(async (providerName) => {
     const provider = createProvider(providerName);
-    const found = await withTimeout(searchOnProvider(provider, allTitles), PROVIDER_TIMEOUT);
+    const found = await withTimeout(searchOnProvider(provider, allTitles), PROVIDER_TIMEOUT, providerName);
     if (!found) throw new Error(`${providerName}: no match found`);
-    const info = await withTimeout(provider.fetchAnimeInfo(found.id), PROVIDER_TIMEOUT);
+    const info = await withTimeout(provider.fetchAnimeInfo(found.id), PROVIDER_TIMEOUT, providerName);
     return { provider: providerName, anime: info };
   });
 
@@ -197,11 +197,11 @@ app.get('/meta/anilist/watch/:episodeId', async (req, res) => {
 
     let sources = null;
 
-    const PROVIDER_TIMEOUT = 14000;
+    const PROVIDER_TIMEOUT = 20000;
 
     const tryProvider = async (name) => {
       const provider = createProvider(name);
-      const result = await withTimeout(provider.fetchEpisodeSources(episodeId), PROVIDER_TIMEOUT);
+      const result = await withTimeout(provider.fetchEpisodeSources(episodeId), PROVIDER_TIMEOUT, name);
       if (result?.sources?.length > 0) return { providerName: name, sources: result };
       throw new Error(`${name}: no sources`);
     };
