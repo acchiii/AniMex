@@ -1309,3 +1309,33 @@
 [2026-05-12 08:26:46] local.WARNING: Jimaku search failed {"anilist_id":14837,"status":400} 
 [2026-05-12 08:27:38] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z Movie 14: Kami to Kami"} 
 [2026-05-12 08:27:48] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z Movie 14: Kami to Kami"} 
+[2026-05-12 10:00:20] local.ERROR: Database connection [postgresql] not configured. {"exception":"[object] (InvalidArgumentException(code: 0): Database connection [postgresql] not configured. at C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:227)
+[stacktrace]
+#0 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(191): Illuminate/Database/DatabaseManager->configuration('postgresql')
+#1 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php(103): Illuminate/Database/DatabaseManager->makeConnection('postgresql')
+#2 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Migrations/DatabaseMigrationRepository.php(226): Illuminate/Database/DatabaseManager->connection('postgresql')
+#3 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Migrations/DatabaseMigrationRepository.php(182): Illuminate/Database/Migrations/DatabaseMigrationRepository->getConnection()
+#4 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(742): Illuminate/Database/Migrations/DatabaseMigrationRepository->repositoryExists()
+#5 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(165): Illuminate/Database/Migrations/Migrator->repositoryExists()
+#6 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Support/helpers.php(338): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}(1)
+#7 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(165): retry(1, Object(Closure), 0, Object(Closure))
+#8 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(141): Illuminate/Database/Console/Migrations/MigrateCommand->repositoryExists()
+#9 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(111): Illuminate/Database/Console/Migrations/MigrateCommand->prepareDatabase()
+#10 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Migrations/Migrator.php(658): Illuminate/Database/Console/Migrations/MigrateCommand->Illuminate/Database/Console/Migrations/{closure}()
+#11 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(110): Illuminate/Database/Migrations/Migrator->usingConnection(NULL, Object(Closure))
+#12 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Database/Console/Migrations/MigrateCommand.php(89): Illuminate/Database/Console/Migrations/MigrateCommand->runMigrations()
+#13 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate/Database/Console/Migrations/MigrateCommand->handle()
+#14 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate/Container/BoundMethod::Illuminate/Container/{closure}()
+#15 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(95): Illuminate/Container/Util::unwrapIfClosure(Object(Closure))
+#16 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate/Container/BoundMethod::callBoundMethod(Object(Illuminate/Foundation/Application), Array, Object(Closure))
+#17 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Container/Container.php(696): Illuminate/Container/BoundMethod::call(Object(Illuminate/Foundation/Application), Array, Array, NULL)
+#18 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Console/Command.php(213): Illuminate/Container/Container->call(Array)
+#19 C:/xampp/htdocs/AniMex/vendor/symfony/console/Command/Command.php(341): Illuminate/Console/Command->execute(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#20 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Console/Command.php(182): Symfony/Component/Console/Command/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Illuminate/Console/OutputStyle))
+#21 C:/xampp/htdocs/AniMex/vendor/symfony/console/Application.php(1117): Illuminate/Console/Command->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#22 C:/xampp/htdocs/AniMex/vendor/symfony/console/Application.php(356): Symfony/Component/Console/Application->doRunCommand(Object(Illuminate/Database/Console/Migrations/MigrateCommand), Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#23 C:/xampp/htdocs/AniMex/vendor/symfony/console/Application.php(195): Symfony/Component/Console/Application->doRun(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#24 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony/Component/Console/Application->run(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#25 C:/xampp/htdocs/AniMex/artisan(12): Illuminate/Foundation/Console/Kernel->handle(Object(Symfony/Component/Console/Input/ArgvInput), Object(Symfony/Component/Console/Output/ConsoleOutput))
+#26 {main}
+"} 
