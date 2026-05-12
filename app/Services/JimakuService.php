@@ -28,19 +28,6 @@ class JimakuService
             return [];
         }
 
-        $cacheKey = $this->cacheKey($anilistId, $episode, $lang);
-        $localPath = "{$this->cacheDir}/{$cacheKey}.vtt";
-        $webPath = url("/subtitles/{$cacheKey}.vtt");
-
-        if (file_exists($localPath)) {
-            return [[
-                'language' => $lang,
-                'label' => strtoupper($lang),
-                'file_path' => $webPath,
-                'is_default' => $lang === 'en',
-            ]];
-        }
-
         $entry = $this->findEntry($anilistId);
         if (!$entry) {
             return [];
@@ -52,8 +39,24 @@ class JimakuService
         }
 
         $file = $this->pickFile($files, $lang);
+        $isExactEnglish = $file && $this->isLang($file['name'] ?? '', 'en');
+
         if (!$file) {
             return [];
+        }
+
+        $actualLang = $isExactEnglish ? $lang : 'ja';
+        $cacheKey = $this->cacheKey($anilistId, $episode, $actualLang);
+        $localPath = "{$this->cacheDir}/{$cacheKey}.vtt";
+        $webPath = url("/subtitles/{$cacheKey}.vtt");
+
+        if (file_exists($localPath)) {
+            return [[
+                'language' => $actualLang,
+                'label' => $this->inferLabel($file['name']),
+                'file_path' => $webPath,
+                'is_default' => $actualLang === 'en',
+            ]];
         }
 
         $content = $this->downloadFile($file['url']);
@@ -70,10 +73,10 @@ class JimakuService
         $label = $this->inferLabel($file['name']);
 
         return [[
-            'language' => $lang,
+            'language' => $actualLang,
             'label' => $label,
             'file_path' => $webPath,
-            'is_default' => $lang === 'en',
+            'is_default' => $actualLang === 'en',
         ]];
     }
 
@@ -150,20 +153,23 @@ class JimakuService
     private function isLang(string $filename, string $lang): bool
     {
         if ($lang === 'en') {
-            return (bool) preg_match('/\[(English|EN)\]|\((English|EN)\)|\.eng\.|_eng_|\bEnglish\b/i', $filename);
+            return (bool) preg_match('/\[English\]|\(English\)|\bEnglish\b|\[EN\]|\(EN\)|\.eng\.|_eng_/i', $filename);
         }
         return true;
     }
 
     private function inferLabel(string $filename): string
     {
-        if (preg_match('/\[English\]|\((English)\)|\bEnglish\b/i', $filename)) {
+        if (preg_match('/\[English\]|\(English\)|\bEnglish\b/i', $filename)) {
             return 'English';
         }
-        if (preg_match('/\[Japanese\]|\((Japanese)\)|\bJapanese\b|\bJPN\b/i', $filename)) {
+        if (preg_match('/\[Japanese\]|\(Japanese\)|\bJapanese\b|\bJPN\b/i', $filename)) {
             return '日本語';
         }
-        return 'English';
+        if (preg_match('/\[EN\]|\(EN\)/i', $filename)) {
+            return 'English';
+        }
+        return 'Japanese';
     }
 
     private function downloadFile(string $url): ?string

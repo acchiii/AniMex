@@ -44,6 +44,14 @@
             <?php endif; ?>
         </div>
 
+        <?php if($bannerAd): ?>
+        <div class="mb-4 flex justify-center">
+            <div class="max-w-lg w-full">
+                <?php echo $__env->make('ads.slot', ['ad' => $bannerAd], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white"><?php echo e($anime->title_english ?: $anime->title); ?>

@@ -13,6 +13,7 @@ use App\Models\WatchHistory;
 use App\Models\Episode;
 use App\Models\EpisodeSource;
 use App\Models\Subtitle;
+use App\Models\AdPosition;
 use App\Services\AnilistVideoSourceService;
 use App\Services\JimakuService;
 use App\Services\OpenSubtitlesService;
@@ -155,43 +156,57 @@ public function stream(string $slug, int $episodeNumber)
             );
         }
 
-        // Fetch English subtitles if missing
-        if ($episode->subtitles->where('language', 'en')->isEmpty()) {
-            $subs = [];
-
-            // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
-            if ($anime->anilist_id && empty($subs)) {
-                $jimaku = app(JimakuService::class);
-                $subs = $jimaku->fetchSubtitles(
-                    (int) $anime->anilist_id,
-                    $episodeNumber,
-                    'en'
-                );
-            }
-
-            // 2. Fall back to OpenSubtitles
-            if (empty($subs)) {
-                $os = app(OpenSubtitlesService::class);
-                $subs = $os->fetchSubtitles(
-                    $anime->title_english ?: $anime->title,
-                    $os->guessSeason($episodeNumber),
-                    $episodeNumber,
-                    'en'
-                );
-            }
-
+        // Fetch English subtitles — always try Jimaku first (replaces mislabeled provider subs)
+        // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
+        $jimakuEnglishFound = false;
+        if ($anime->anilist_id) {
+            $jimaku = app(JimakuService::class);
+            $subs = $jimaku->fetchSubtitles(
+                (int) $anime->anilist_id,
+                $episodeNumber,
+                'en'
+            );
             if (!empty($subs)) {
+                $episode->subtitles()->where('language', 'en')->delete();
                 foreach ($subs as $sub) {
-                    \App\Models\Subtitle::firstOrCreate(
-                        ['episode_id' => $episode->id, 'language' => $sub['language']],
-                        $sub
-                    );
+                    \App\Models\Subtitle::create(['episode_id' => $episode->id] + $sub);
                 }
-                $episode->load('subtitles');
+                if ($subs[0]['language'] === 'en') {
+                    $jimakuEnglishFound = true;
+                }
             }
         }
 
-        return view('anime.stream', compact('episode', 'anime', 'episodes', 'nextEpisode', 'prevEpisode'));
+        // 2. Fall back to OpenSubtitles if Jimaku didn't find English subs
+        if (!$jimakuEnglishFound) {
+            $episode->subtitles()->where('language', 'en')->delete();
+            $os = app(OpenSubtitlesService::class);
+            $subs = $os->fetchSubtitles(
+                $anime->title_english ?: $anime->title,
+                $os->guessSeason($episodeNumber),
+                $episodeNumber,
+                'en'
+            );
+            if (!empty($subs)) {
+                foreach ($subs as $sub) {
+                    \App\Models\Subtitle::create(['episode_id' => $episode->id] + $sub);
+                }
+            }
+        }
+
+        $episode->load('subtitles');
+
+        // Ads
+        $bannerAd = null;
+        $user = auth()->user();
+        if (!$user || !$user->isPremium()) {
+            $position = AdPosition::where('key', 'episode_overlay')->first();
+            if ($position) {
+                $bannerAd = $position->getActiveAd($user);
+            }
+        }
+
+        return view('anime.stream', compact('episode', 'anime', 'episodes', 'nextEpisode', 'prevEpisode', 'bannerAd'));
     }
 
     private function fetchSourcesOnTheFly($anime, $episode): ?string

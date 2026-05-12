@@ -43,6 +43,14 @@
             @endif
         </div>
 
+        @if($bannerAd)
+        <div class="mb-4 flex justify-center">
+            <div class="max-w-lg w-full">
+                @include('ads.slot', ['ad' => $bannerAd])
+            </div>
+        </div>
+        @endif
+
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $anime->title_english ?: $anime->title }}
