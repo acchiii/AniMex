@@ -23,7 +23,7 @@ export default defineConfig({
         cors: true,
 
         hmr: {
-            host: '192.168.1.3',
+            host: 'animex.acchiii.vercel.app',
         },
     },
 
