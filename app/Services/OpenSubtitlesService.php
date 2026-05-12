@@ -22,6 +22,13 @@ class OpenSubtitlesService
         return $this->apiKey !== '';
     }
 
+    private array $langLabels = [
+        'en' => 'English',
+        'ja' => '日本語',
+        'fil' => 'Tagalog',
+        'id' => 'Bahasa Indonesia',
+    ];
+
     public function fetchSubtitles(string $title, int $season, int $episode, string $lang = 'en'): array
     {
         if (!$this->isConfigured()) {
@@ -32,10 +39,12 @@ class OpenSubtitlesService
         $localPath = "{$this->cacheDir}/{$cacheKey}.vtt";
         $webPath = url("/subtitles/{$cacheKey}.vtt");
 
+        $label = $this->langLabels[$lang] ?? strtoupper($lang);
+
         if (file_exists($localPath)) {
             return [[
                 'language' => $lang,
-                'label' => strtoupper($lang),
+                'label' => $label,
                 'file_path' => $webPath,
                 'is_default' => $lang === 'en',
             ]];
@@ -69,7 +78,7 @@ class OpenSubtitlesService
 
         return [[
             'language' => $lang,
-            'label' => strtoupper($lang),
+            'label' => $label,
             'file_path' => $webPath,
             'is_default' => $lang === 'en',
         ]];

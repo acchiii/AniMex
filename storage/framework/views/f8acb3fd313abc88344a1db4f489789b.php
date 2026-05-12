@@ -36,6 +36,12 @@
         <?php echo $__env->make('layouts.partials.footer', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         <?php echo $__env->make('layouts.partials.auth-modals', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     </div>
+    <?php if(config('ads.propellerads.interstitial_zone')): ?>
+    <script type="text/javascript" src="//<?php echo e(config('ads.propellerads.interstitial_zone')); ?>.propellerads.com/script.js" async></script>
+    <?php endif; ?>
+    <?php if(config('ads.propellerads.popunder_zone')): ?>
+    <script type="text/javascript" src="//<?php echo e(config('ads.propellerads.popunder_zone')); ?>.propellerads.com/script.js" async></script>
+    <?php endif; ?>
     <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 </html>

@@ -154,15 +154,22 @@ class AnilistVideoSourceService
             }
 
             $subtitles = [];
+            $allowedLangs = ['en', 'ja'];
+            $langLabels = [
+                'en' => 'English',
+                'ja' => '日本語',
+            ];
             foreach (Arr::get($watchData, 'subtitles', []) as $t) {
                 $url = (string) Arr::get($t, 'url', '');
                 if ($url === '') continue;
 
                 $lang = (string) Arr::get($t, 'lang', 'en');
 
+                if (!in_array($lang, $allowedLangs, true)) continue;
+
                 $subtitles[] = [
                     'language' => $lang,
-                    'label' => strtoupper($lang),
+                    'label' => $langLabels[$lang] ?? strtoupper($lang),
                     'file_path' => $url,
                     'is_default' => $lang === 'en',
                 ];

@@ -30,6 +30,7 @@
                         <path d="M8 5v14l11-7z" />
                     </svg>
                 </div>
+                <div id="subtitle-hud"></div>
             @else
                 <div class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                     <div class="text-center">
@@ -41,13 +42,25 @@
                     </div>
                 </div>
             @endif
+
         </div>
 
         @if($bannerAd)
-        <div class="mb-4 flex justify-center">
-            <div class="max-w-lg w-full">
-                @include('ads.slot', ['ad' => $bannerAd])
-            </div>
+        <div class="mb-4">
+            <a href="{{ $bannerAd->target_url }}" target="_blank" rel="sponsored noopener"
+               class="group flex items-center gap-3 p-2.5 bg-gray-100 dark:bg-gray-800/80 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-all border border-gray-200 dark:border-gray-700/50">
+                <div class="flex-shrink-0 w-20 h-12 rounded overflow-hidden bg-gray-300 dark:bg-gray-700">
+                    <img src="{{ $bannerAd->image_url }}" alt="{{ $bannerAd->title }}"
+                         class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-900 dark:text-white truncate">{{ $bannerAd->title }}</p>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">Sponsored</p>
+                </div>
+                <svg class="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+            </a>
         </div>
         @endif
 
@@ -97,16 +110,47 @@
 
         @if($episode->subtitles->count() > 0)
             <div class="mb-4">
-                <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtitles</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="disableSubtitles()"
-                        class="px-3 py-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300">Off</button>
+                <div class="flex items-center gap-2 mb-2">
+                    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Subtitles</h3>
+                    <button id="sub-settings-btn" onclick="toggleSubSettings()" class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" title="Subtitle settings">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center" id="subtitle-buttons">
+                    <button onclick="selectSubtitle(null)"
+                        class="sub-btn sub-off px-3 py-1 rounded text-sm transition">Off</button>
                     @foreach($episode->subtitles as $subtitle)
-                        <button onclick="enableSubtitle('{{ $subtitle->language }}')"
-                            class="px-3 py-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300">
-                            {{ $subtitle->label }}
-                        </button>
+                        <div class="flex items-center gap-1">
+                            <button onclick="selectSubtitle('{{ $subtitle->language }}')"
+                                class="sub-btn sub-{{ $subtitle->language }} px-3 py-1 rounded text-sm transition">
+                                {{ $subtitle->label }}
+                            </button>
+                            <button onclick="downloadSubtitle('{{ $subtitle->language }}')"
+                                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" title="Download {{ $subtitle->label }} subtitles">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            </button>
+                        </div>
                     @endforeach
+                </div>
+                <div id="sub-settings-panel" class="hidden mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <div class="flex flex-wrap gap-4">
+                        <div>
+                            <label class="text-xs text-gray-600 dark:text-gray-400 block mb-1">Font Size</label>
+                            <div class="flex gap-1">
+                                <button onclick="setSubSize('sm')" class="sub-size-btn px-2 py-1 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" data-size="sm">A</button>
+                                <button onclick="setSubSize('md')" class="sub-size-btn px-2 py-1 text-sm rounded bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500 text-gray-700 dark:text-gray-300" data-size="md">A</button>
+                                <button onclick="setSubSize('lg')" class="sub-size-btn px-2 py-1 text-base rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" data-size="lg">A</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600 dark:text-gray-400 block mb-1">Background</label>
+                            <div class="flex gap-1">
+                                <button onclick="setSubBg('off')" class="sub-bg-btn px-2 py-1 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" data-bg="off">Off</button>
+                                <button onclick="setSubBg('semi')" class="sub-bg-btn px-2 py-1 text-xs rounded bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500 text-gray-700 dark:text-gray-300" data-bg="semi">Semi</button>
+                                <button onclick="setSubBg('solid')" class="sub-bg-btn px-2 py-1 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" data-bg="solid">Solid</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif
@@ -137,7 +181,61 @@
             </a>
         </div>
     </div>
+<div id="sub-toast"></div>
 @endsection
+
+@push('styles')
+<style>
+    #subtitle-hud {
+        position: absolute;
+        bottom: 64px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.75);
+        color: #fff;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    #subtitle-hud.show { opacity: 1; }
+    #sub-toast {
+        position: fixed;
+        bottom: 80px;
+        right: 24px;
+        background: rgba(0,0,0,0.8);
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }
+    #sub-toast.show { opacity: 1; }
+    .sub-btn {
+        background: rgb(229 231 235);
+        color: rgb(55 65 81);
+    }
+    .dark .sub-btn {
+        background: rgb(31 41 55);
+        color: rgb(209 213 219);
+    }
+    .sub-btn:hover {
+        background: rgb(209 213 219);
+    }
+    .dark .sub-btn:hover {
+        background: rgb(55 65 81);
+    }
+    .sub-btn.active {
+        box-shadow: 0 0 0 2px rgb(168 85 247);
+    }
+</style>
+@endpush
 
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -152,6 +250,7 @@
         $proxySubtitleUrl = route('proxy.subtitle');
         $subtitlesData = $episode->subtitles->map(fn($s) => [
             'language' => $s->language,
+            'label' => $s->label,
             'file_path' => $s->file_path,
             'proxy_path' => (function ($url) use ($proxySubtitleUrl) {
                 $parsed = parse_url($url);
@@ -165,10 +264,20 @@
         const sources = @json($sourcesData);
         const subtitles = @json($subtitlesData);
 
+        const LANG_LABELS = { 'en': 'English', 'ja': '日本語' };
+        const STORAGE_KEY_SUB = 'animex_sub_lang';
+        const STORAGE_KEY_SIZE = 'animex_sub_size';
+        const STORAGE_KEY_BG = 'animex_sub_bg';
+
         let hls = null;
         const player = document.getElementById('video-player');
         const embedPlayer = document.getElementById('embed-player');
         const playOverlay = document.getElementById('play-overlay');
+
+        let activeSubLang = null;
+        let subtitleOffset = 0;
+        let userSubChoice = false;
+        let originalVttCache = {};
 
         function playVideo() {
             playOverlay.classList.add('hidden');
@@ -181,8 +290,6 @@
         function loadSource(index) {
             const src = sources[index];
             if (!src) return;
-
-            console.log('Loading source', index, src);
 
             if (hls) { hls.destroy(); hls = null; }
 
@@ -236,7 +343,6 @@
                     console.warn('HLS error:', data.type, data.details, data.fatal);
                     if (data.fatal) {
                         if (data.details === 'manifestLoadError' || data.details === 'levelLoadError') {
-                            console.warn('Direct source failed, trying proxy...');
                             hls.loadSource(proxyUrl);
                             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                                 player.play().catch(function () {
@@ -244,7 +350,6 @@
                                 });
                             });
                         } else if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
-                            console.warn('Buffer error, restarting load...');
                             hls.startLoad();
                         }
                     }
@@ -298,35 +403,278 @@
             document.querySelector(`.source-btn[data-index="${index}"]`)?.classList.add('ring-2', 'ring-purple-500');
         }
 
-        function disableSubtitles() {
-            if (player) {
-                for (let track of player.textTracks) {
-                    track.mode = 'disabled';
+        // ─── Subtitle System ────────────────────────────────────────────────
+
+        function getSubUrl(sub) {
+            return sub.proxy_path || sub.file_path;
+        }
+
+        function rebuildTracks() {
+            if (!player) return;
+            var existingTracks = player.querySelectorAll('track');
+            existingTracks.forEach(function (t) { t.remove(); });
+
+            subtitles.forEach(function (sub) {
+                var track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.srclang = sub.language;
+                track.label = sub.label;
+
+                if (sub.language === activeSubLang && subtitleOffset !== 0) {
+                    var origUrl = getSubUrl(sub);
+                    fetchAndAdjustVtt(origUrl, subtitleOffset, function (blobUrl) {
+                        track.src = blobUrl;
+                        track.addEventListener('load', function () {
+                            if (player.textTracks) {
+                                for (var i = 0; i < player.textTracks.length; i++) {
+                                    var t = player.textTracks[i];
+                                    t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    track.src = getSubUrl(sub);
+                }
+
+                track.default = sub.language === 'en' && !activeSubLang;
+                player.appendChild(track);
+            });
+
+            if (activeSubLang && player.textTracks) {
+                for (var i = 0; i < player.textTracks.length; i++) {
+                    var t = player.textTracks[i];
+                    t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
                 }
             }
         }
 
-        function enableSubtitle(language) {
-            if (player) {
-                for (let track of player.textTracks) {
-                    track.mode = (track.language === language) ? 'showing' : 'hidden';
+        function fetchAndAdjustVtt(url, offset, callback) {
+            if (originalVttCache[url]) {
+                callback(adjustVttBlob(originalVttCache[url], offset));
+                return;
+            }
+            fetch(url).then(function (r) { return r.text(); }).then(function (vtt) {
+                originalVttCache[url] = vtt;
+                callback(adjustVttBlob(vtt, offset));
+            }).catch(function () {
+                callback(url);
+            });
+        }
+
+        function adjustVttBlob(vtt, offset) {
+            if (offset === 0) {
+                var blob = new Blob([vtt], { type: 'text/vtt' });
+                return URL.createObjectURL(blob);
+            }
+            var adjusted = vtt.replace(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/g, function (match, h, m, s, ms) {
+                var totalMs = (parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s)) * 1000 + parseInt(ms);
+                totalMs += offset * 1000;
+                if (totalMs < 0) totalMs = 0;
+                var nh = String(Math.floor(totalMs / 3600000)).padStart(2, '0');
+                var nm = String(Math.floor((totalMs % 3600000) / 60000)).padStart(2, '0');
+                var ns = String(Math.floor((totalMs % 60000) / 1000)).padStart(2, '0');
+                var nms = String(Math.floor(totalMs % 1000)).padStart(3, '0');
+                return nh + ':' + nm + ':' + ns + '.' + nms;
+            });
+            var blob = new Blob([adjusted], { type: 'text/vtt' });
+            return URL.createObjectURL(blob);
+        }
+
+        function selectSubtitle(lang) {
+            userSubChoice = true;
+            activeSubLang = lang;
+
+            document.querySelectorAll('.sub-btn').forEach(function (btn) {
+                btn.classList.remove('active', 'ring-2', 'ring-purple-500');
+                btn.style.boxShadow = 'none';
+            });
+
+            if (lang) {
+                var activeBtn = document.querySelector('.sub-' + lang);
+                if (activeBtn) {
+                    activeBtn.classList.add('active', 'ring-2', 'ring-purple-500');
+                    activeBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
                 }
+                showSubToast('Subtitles: ' + (LANG_LABELS[lang] || lang.toUpperCase()));
+                player.textTracks.forEach(function (track) {
+                    track.mode = (track.language === lang) ? 'showing' : 'hidden';
+                });
+            } else {
+                var offBtn = document.querySelector('.sub-off');
+                if (offBtn) {
+                    offBtn.classList.add('active', 'ring-2', 'ring-purple-500');
+                    offBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
+                }
+                showSubToast('Subtitles: Off');
+                player.textTracks.forEach(function (track) {
+                    track.mode = 'disabled';
+                });
+            }
+
+            localStorage.setItem(STORAGE_KEY_SUB, lang || '');
+        }
+
+        function selectSubtitleByLang(lang) {
+            selectSubtitle(lang);
+        }
+
+        function cycleSubtitle() {
+            var langs = subtitles.map(function (s) { return s.language; });
+            var idx = activeSubLang ? langs.indexOf(activeSubLang) : -1;
+            if (idx < 0 || idx >= langs.length - 1) {
+                selectSubtitle(null);
+            } else {
+                selectSubtitle(langs[idx + 1]);
             }
         }
+
+        function adjustOffset(delta) {
+            subtitleOffset += delta;
+            if (Math.abs(subtitleOffset) < 0.1) subtitleOffset = 0;
+            var hud = document.getElementById('subtitle-hud');
+            if (hud) {
+                var sign = subtitleOffset >= 0 ? '+' : '';
+                hud.textContent = 'Sub ' + sign + subtitleOffset.toFixed(1) + 's';
+                hud.classList.add('show');
+                clearTimeout(hud._hideTimer);
+                hud._hideTimer = setTimeout(function () { hud.classList.remove('show'); }, 2000);
+            }
+            rebuildTracks();
+            if (activeSubLang) {
+                selectSubtitle(activeSubLang);
+            }
+        }
+
+        function showSubToast(msg) {
+            var toast = document.getElementById('sub-toast');
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toast._hideTimer);
+            toast._hideTimer = setTimeout(function () { toast.classList.remove('show'); }, 2000);
+        }
+
+        function downloadSubtitle(lang) {
+            var sub = subtitles.find(function (s) { return s.language === lang; });
+            if (!sub) return;
+            var url = getSubUrl(sub);
+            fetch(url).then(function (r) { return r.blob(); }).then(function (blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'subtitle_' + lang + '.vtt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }).catch(function () { });
+        }
+
+        // ─── Subtitle Settings ──────────────────────────────────────────────
+
+        function toggleSubSettings() {
+            var panel = document.getElementById('sub-settings-panel');
+            if (panel) panel.classList.toggle('hidden');
+        }
+
+        function setSubSize(size) {
+            ['sm', 'md', 'lg'].forEach(function (s) {
+                player.classList.remove('subtitle-' + s);
+            });
+            if (size !== 'md') player.classList.add('subtitle-' + size);
+            document.querySelectorAll('.sub-size-btn').forEach(function (btn) {
+                btn.classList.remove('ring-2', 'ring-purple-500');
+                if (btn.dataset.size === size) btn.classList.add('ring-2', 'ring-purple-500');
+            });
+            localStorage.setItem(STORAGE_KEY_SIZE, size);
+        }
+
+        function setSubBg(bg) {
+            ['off', 'semi', 'solid'].forEach(function (b) {
+                player.classList.remove('subtitle-bg-' + b);
+            });
+            if (bg !== 'semi') player.classList.add('subtitle-bg-' + bg);
+            document.querySelectorAll('.sub-bg-btn').forEach(function (btn) {
+                btn.classList.remove('ring-2', 'ring-purple-500');
+                if (btn.dataset.bg === bg) btn.classList.add('ring-2', 'ring-purple-500');
+            });
+            localStorage.setItem(STORAGE_KEY_BG, bg);
+        }
+
+        function loadSubSettings() {
+            var size = localStorage.getItem(STORAGE_KEY_SIZE) || 'md';
+            var bg = localStorage.getItem(STORAGE_KEY_BG) || 'semi';
+            setSubSize(size);
+            setSubBg(bg);
+        }
+
+        // ─── PropellerAds Integration ─────────────────────────────────────
+        //
+        // To enable, set these in your .env file:
+        //   PROPELLERADS_INTERSTITIAL_ZONE=your_zone_id
+        //   PROPELLERADS_POPUNDER_ZONE=your_zone_id
+        //
+        // Base scripts are loaded from layouts/app.blade.php.
+        // Interstitial (full-screen pre-roll): auto-fires when script loads.
+        //   To trigger manually: propellerads_show_ad(window.location.href)
+        // Pop-under: fires once on first user click below.
+
+        @if(config('ads.propellerads.popunder_zone'))
+        document.addEventListener('click', function popunderOnce() {
+            if (typeof propellerads_popunder === 'function') {
+                try { propellerads_popunder(window.location.href); } catch (e) {}
+            }
+            document.removeEventListener('click', popunderOnce);
+        }, { once: true });
+        @endif
+
+        // ─── Initialization ────────────────────────────────────────────────
 
         document.addEventListener('DOMContentLoaded', function () {
-            if (sources.length > 0) {
-                loadSource(0);
+            var savedLang = localStorage.getItem(STORAGE_KEY_SUB);
+            if (savedLang) {
+                var found = subtitles.some(function (s) { return s.language === savedLang; });
+                if (found) activeSubLang = savedLang;
+            }
+            loadSubSettings();
+            if (sources.length > 0) loadSource(0);
+            setTimeout(function () {
+                if (activeSubLang) {
+                    selectSubtitle(activeSubLang);
+                } else if (subtitles.length > 0) {
+                    var enSub = subtitles.find(function (s) { return s.language === 'en'; });
+                    if (enSub) {
+                        activeSubLang = 'en';
+                        selectSubtitle('en');
+                    }
+                }
+            }, 1000);
+        });
+
+        // ─── Keyboard Shortcuts ────────────────────────────────────────────
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (embedPlayer && !embedPlayer.classList.contains('hidden')) return;
+
+            switch (e.key) {
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    cycleSubtitle();
+                    break;
+                case '[':
+                    e.preventDefault();
+                    adjustOffset(-0.5);
+                    break;
+                case ']':
+                    e.preventDefault();
+                    adjustOffset(0.5);
+                    break;
             }
         });
 
-        function enableEnglishSubs() {
-            if (!player) return;
-            for (let track of player.textTracks) {
-                var isEn = track.language && (track.language === 'en' || track.language.startsWith('en') || track.language === 'eng');
-                track.mode = isEn ? 'showing' : 'hidden';
-            }
-        }
+        // ─── Video Events ──────────────────────────────────────────────────
 
         if (player) {
             player.addEventListener('timeupdate', function () {
@@ -337,10 +685,25 @@
             player.addEventListener('error', function () {
                 console.warn('Video error:', player.error ? player.error.message : 'unknown', 'code:', player.error ? player.error.code : 'none');
             });
-            player.textTracks.addEventListener('addtrack', enableEnglishSubs);
             player.addEventListener('loadedmetadata', function () {
                 console.log('Video loaded, duration:', player.duration);
-                setTimeout(enableEnglishSubs, 500);
+                if (!userSubChoice && !activeSubLang && subtitles.length > 0) {
+                    var enSub = subtitles.find(function (s) { return s.language === 'en'; });
+                    if (enSub) {
+                        activeSubLang = 'en';
+                        setTimeout(function () { selectSubtitle('en'); }, 500);
+                    }
+                } else if (activeSubLang) {
+                    setTimeout(function () { selectSubtitle(activeSubLang); }, 500);
+                }
+            });
+            player.textTracks.addEventListener('addtrack', function () {
+                if (!userSubChoice && activeSubLang) {
+                    for (var i = 0; i < player.textTracks.length; i++) {
+                        var t = player.textTracks[i];
+                        t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
+                    }
+                }
             });
         }
 

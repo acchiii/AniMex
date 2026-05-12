@@ -36,6 +36,12 @@
         @include('layouts.partials.footer')
         @include('layouts.partials.auth-modals')
     </div>
+    @if(config('ads.propellerads.interstitial_zone'))
+    <script type="text/javascript" src="//{{ config('ads.propellerads.interstitial_zone') }}.propellerads.com/script.js" async></script>
+    @endif
+    @if(config('ads.propellerads.popunder_zone'))
+    <script type="text/javascript" src="//{{ config('ads.propellerads.popunder_zone') }}.propellerads.com/script.js" async></script>
+    @endif
     @stack('scripts')
 </body>
 </html>

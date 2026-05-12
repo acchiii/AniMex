@@ -88,3 +88,4 @@ Route::post('/progress', [AnimeController::class, 'saveProgress'])->name('progre
 Route::get('/proxy/subtitle', [AnimeController::class, 'proxySubtitle'])->name('proxy.subtitle');
 Route::get('/subtitles/{filename}', [AnimeController::class, 'serveSubtitle'])->name('subtitle.serve');
 
+

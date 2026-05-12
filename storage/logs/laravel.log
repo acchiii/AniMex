@@ -1282,3 +1282,30 @@
 #65 C:/xampp/htdocs/AniMex/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('C://xampp//htdocs...')
 #66 {main}
 "} 
+[2026-05-12 07:48:22] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:48:31] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:55:14] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:55:22] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:56:08] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:56:21] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:59:02] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:59:11] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:59:15] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 07:59:19] local.WARNING: Jimaku search failed {"anilist_id":127230,"status":400} 
+[2026-05-12 08:06:16] local.WARNING: Jimaku search failed {"anilist_id":101302,"status":400} 
+[2026-05-12 08:06:26] local.WARNING: Jimaku search failed {"anilist_id":101302,"status":400} 
+[2026-05-12 08:08:32] local.WARNING: Jimaku search failed {"anilist_id":101302,"status":400} 
+[2026-05-12 08:08:41] local.WARNING: Jimaku search failed {"anilist_id":101302,"status":400} 
+[2026-05-12 08:23:10] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":198113,"episode":4,"used_title":"Kill Ao"} 
+[2026-05-12 08:23:12] local.WARNING: Jimaku search failed {"anilist_id":198113,"status":400} 
+[2026-05-12 08:23:26] local.WARNING: Jimaku search failed {"anilist_id":198113,"status":400} 
+[2026-05-12 08:25:35] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":198113,"episode":2,"used_title":"Kill Ao"} 
+[2026-05-12 08:25:36] local.WARNING: Jimaku search failed {"anilist_id":198113,"status":400} 
+[2026-05-12 08:25:52] local.WARNING: Jimaku search failed {"anilist_id":198113,"status":400} 
+[2026-05-12 08:26:12] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z Movie 14: Kami to Kami","error":"Watch endpoint returned 404"} 
+[2026-05-12 08:26:27] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z: Battle of Gods","error":"Watch endpoint returned 404"} 
+[2026-05-12 08:26:42] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":14837,"episode":1,"used_title":"ドラゴンボールZ 神と神","error":"Watch endpoint returned 404"} 
+[2026-05-12 08:26:45] local.WARNING: On-the-fly source fetch failed {"anime":12,"episode":251,"titles":["Dragon Ball Z Movie 14: Kami to Kami","Dragon Ball Z: Battle of Gods","ドラゴンボールZ 神と神"],"error":"No sources found for AniList ID 14837, episode 1"} 
+[2026-05-12 08:26:46] local.WARNING: Jimaku search failed {"anilist_id":14837,"status":400} 
+[2026-05-12 08:27:38] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z Movie 14: Kami to Kami"} 
+[2026-05-12 08:27:48] local.INFO: AnilistVideoSource: Found sources via Consumet {"anilist_id":14837,"episode":1,"used_title":"Dragon Ball Z Movie 14: Kami to Kami"} 

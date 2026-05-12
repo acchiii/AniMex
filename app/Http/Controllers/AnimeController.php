@@ -258,16 +258,20 @@ public function stream(string $slug, int $episodeNumber)
                     ]);
                 }
 
+                $allowedLangs = ['en', 'ja'];
                 foreach ($result['subtitles'] ?? [] as $t) {
                     $filePath = (string) ($t['file_path'] ?? '');
                     if ($filePath === '') continue;
 
+                    $lang = (string) ($t['language'] ?? 'en');
+                    if (!in_array($lang, $allowedLangs, true)) continue;
+
                     Subtitle::create([
                         'episode_id' => $episode->id,
-                        'language' => (string) ($t['language'] ?? 'en'),
-                        'label' => (string) ($t['label'] ?? strtoupper((string) ($t['language'] ?? 'en'))),
+                        'language' => $lang,
+                        'label' => (string) ($t['label'] ?? strtoupper($lang)),
                         'file_path' => $filePath,
-                        'is_default' => (bool) ($t['is_default'] ?? false),
+                        'is_default' => $lang === 'en',
                     ]);
                 }
             });
@@ -789,4 +793,5 @@ public function stream(string $slug, int $episodeNumber)
             'Cache-Control' => 'public, max-age=86400',
         ]);
     }
+
 }
