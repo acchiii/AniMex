@@ -43,13 +43,25 @@
                     </div>
                 </div>
             <?php endif; ?>
+
         </div>
 
         <?php if($bannerAd): ?>
-        <div class="mb-4 flex justify-center">
-            <div class="max-w-lg w-full">
-                <?php echo $__env->make('ads.slot', ['ad' => $bannerAd], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-            </div>
+        <div class="mb-4">
+            <a href="<?php echo e($bannerAd->target_url); ?>" target="_blank" rel="sponsored noopener"
+               class="group flex items-center gap-3 p-2.5 bg-gray-100 dark:bg-gray-800/80 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-all border border-gray-200 dark:border-gray-700/50">
+                <div class="flex-shrink-0 w-20 h-12 rounded overflow-hidden bg-gray-300 dark:bg-gray-700">
+                    <img src="<?php echo e($bannerAd->image_url); ?>" alt="<?php echo e($bannerAd->title); ?>"
+                         class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-900 dark:text-white truncate"><?php echo e($bannerAd->title); ?></p>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">Sponsored</p>
+                </div>
+                <svg class="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+            </a>
         </div>
         <?php endif; ?>
 
@@ -600,6 +612,26 @@
             setSubSize(size);
             setSubBg(bg);
         }
+
+        // ─── PropellerAds Integration ─────────────────────────────────────
+        //
+        // To enable, set these in your .env file:
+        //   PROPELLERADS_INTERSTITIAL_ZONE=your_zone_id
+        //   PROPELLERADS_POPUNDER_ZONE=your_zone_id
+        //
+        // Base scripts are loaded from layouts/app.blade.php.
+        // Interstitial (full-screen pre-roll): auto-fires when script loads.
+        //   To trigger manually: propellerads_show_ad(window.location.href)
+        // Pop-under: fires once on first user click below.
+
+        <?php if(config('ads.propellerads.popunder_zone')): ?>
+        document.addEventListener('click', function popunderOnce() {
+            if (typeof propellerads_popunder === 'function') {
+                try { propellerads_popunder(window.location.href); } catch (e) {}
+            }
+            document.removeEventListener('click', popunderOnce);
+        }, { once: true });
+        <?php endif; ?>
 
         // ─── Initialization ────────────────────────────────────────────────
 

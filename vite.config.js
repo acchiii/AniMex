@@ -17,13 +17,18 @@ export default defineConfig({
         },
     },
 
+      build: {
+        outDir: 'public/build',
+        emptyOutDir: true,
+    },
+
     server: {
         host: '0.0.0.0',
         port: 5173,
         cors: true,
 
         hmr: {
-            host: 'animex.acchiii.vercel.app',
+            host: '192.168.100.32',
         },
     },
 
