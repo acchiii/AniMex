@@ -28,7 +28,7 @@ export default defineConfig({
         cors: true,
 
         hmr: {
-            host: 'https://ani-mex.vercel.app',
+            host: 'https://anime.acchiii.vercel.app/',
         },
     },
 
