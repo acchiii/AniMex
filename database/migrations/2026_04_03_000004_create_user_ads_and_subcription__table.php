@@ -65,20 +65,30 @@ return new class extends Migration {
         });
 
         // Subscriptions
-        Schema::create('subscriptions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('plan_id')->constrained()->cascadeOnDelete();
-            $table->enum('status', ['active', 'cancelled', 'expired', 'pending'])->default('pending');
-            $table->string('payment_provider')->nullable();
-            $table->string('payment_id')->nullable();
-            $table->decimal('amount', 8, 2)->nullable();
-            $table->string('currency')->default('USD');
-            $table->timestamp('starts_at')->nullable();
-            $table->timestamp('ends_at')->nullable();
-            $table->boolean('auto_renew')->default(true);
-            $table->timestamps();
-        });
+        // Subscriptions
+Schema::create('subscriptions', function (Blueprint $table) {
+    $table->id();
+
+    $table->foreignId('user_id')
+        ->constrained('users')
+        ->cascadeOnDelete();
+
+    $table->foreignId('plan_id')
+        ->constrained('subscription_plans')
+        ->cascadeOnDelete();
+
+    $table->enum('status', ['active', 'cancelled', 'expired', 'pending'])
+        ->default('pending');
+
+    $table->string('payment_provider')->nullable();
+    $table->string('payment_id')->nullable();
+    $table->decimal('amount', 8, 2)->nullable();
+    $table->string('currency')->default('USD');
+    $table->timestamp('starts_at')->nullable();
+    $table->timestamp('ends_at')->nullable();
+    $table->boolean('auto_renew')->default(true);
+    $table->timestamps();
+});
     }
 
     public function down(): void
