@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdPosition;
 use App\Models\Anime;
-use App\Models\Genre;
-use App\Models\Studio;
-use App\Models\Tag;
-use App\Models\Rating;
-use App\Models\Favorite;
 use App\Models\Comment;
-use App\Models\WatchHistory;
 use App\Models\Episode;
 use App\Models\EpisodeSource;
+use App\Models\Favorite;
+use App\Models\Genre;
+use App\Models\Rating;
+use App\Models\Studio;
 use App\Models\Subtitle;
-use App\Models\AdPosition;
+use App\Models\WatchHistory;
 use App\Services\AnilistVideoSourceService;
 use App\Services\JimakuService;
 use App\Services\OpenSubtitlesService;
@@ -24,12 +23,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /** Helper function for auth check */
-function user_check(): bool {
+function user_check(): bool
+{
     return Auth::check();
 }
 
 /** Helper function to get user id */
-function user_id(): ?int {
+function user_id(): ?int
+{
     return Auth::id();
 }
 
@@ -62,8 +63,8 @@ class AnimeController extends Controller
 
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
-                $q->where('title', 'like', '%' . $request->search . '%')
-                  ->orWhere('synopsis', 'like', '%' . $request->search . '%');
+                $q->where('title', 'like', '%'.$request->search.'%')
+                    ->orWhere('synopsis', 'like', '%'.$request->search.'%');
             });
         }
 
@@ -71,7 +72,7 @@ class AnimeController extends Controller
         $sortBy = $request->get('sort', 'created_at');
         $sortOrder = $request->get('order', 'desc');
         $allowedSorts = ['title', 'aired_year', 'rating', 'views_count', 'created_at'];
-        
+
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
         }
@@ -93,9 +94,9 @@ class AnimeController extends Controller
         $related = Anime::whereHas('genres', function ($q) use ($anime) {
             $q->whereIn('genres.id', $anime->genres->pluck('id'));
         })
-        ->where('id', '!=', $anime->id)
-        ->limit(6)
-        ->get();
+            ->where('id', '!=', $anime->id)
+            ->limit(6)
+            ->get();
 
         // User interactions
         $userRating = null;
@@ -118,11 +119,11 @@ class AnimeController extends Controller
         return view('anime.show', compact('anime', 'related', 'userRating', 'isFavorite', 'userWatchProgress'));
     }
 
-public function stream(string $slug, int $episodeNumber)
+    public function stream(string $slug, int $episodeNumber)
     {
         $anime = Anime::where('slug', $slug)->firstOrFail();
-        
-        $episode = \App\Models\Episode::where('anime_id', $anime->id)
+
+        $episode = Episode::where('anime_id', $anime->id)
             ->where('number', $episodeNumber)
             ->with(['sources' => function ($q) {
                 $q->orderByDesc('quality');
@@ -150,7 +151,7 @@ public function stream(string $slug, int $episodeNumber)
         // Update watch history
         if (auth()->check()) {
             $userId = auth()->id();
-            \App\Models\WatchHistory::updateOrCreate(
+            WatchHistory::updateOrCreate(
                 ['user_id' => $userId, 'episode_id' => $episode->id],
                 ['anime_id' => $anime->id, 'watched_at' => now()]
             );
@@ -158,18 +159,22 @@ public function stream(string $slug, int $episodeNumber)
 
         // Fetch English subtitles — always try Jimaku first (replaces mislabeled provider subs)
         // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
-        $jimakuEnglishFound = false;
-        if ($anime->anilist_id) {
+        $hasCachedEnglish = $episode->subtitles()
+            ->where('language', 'en')
+            ->where('file_path', 'like', '%/subtitles/%')
+            ->exists();
+        $jimakuEnglishFound = $hasCachedEnglish;
+        if (! $hasCachedEnglish && $anime->anilist_id) {
             $jimaku = app(JimakuService::class);
             $subs = $jimaku->fetchSubtitles(
                 (int) $anime->anilist_id,
                 $episodeNumber,
                 'en'
             );
-            if (!empty($subs)) {
+            if (! empty($subs)) {
                 $episode->subtitles()->where('language', 'en')->delete();
                 foreach ($subs as $sub) {
-                    \App\Models\Subtitle::create(['episode_id' => $episode->id] + $sub);
+                    Subtitle::create(['episode_id' => $episode->id] + $sub);
                 }
                 if ($subs[0]['language'] === 'en') {
                     $jimakuEnglishFound = true;
@@ -178,7 +183,7 @@ public function stream(string $slug, int $episodeNumber)
         }
 
         // 2. Fall back to OpenSubtitles if Jimaku didn't find English subs
-        if (!$jimakuEnglishFound) {
+        if (! $jimakuEnglishFound && ! $hasCachedEnglish) {
             $episode->subtitles()->where('language', 'en')->delete();
             $os = app(OpenSubtitlesService::class);
             $subs = $os->fetchSubtitles(
@@ -187,9 +192,9 @@ public function stream(string $slug, int $episodeNumber)
                 $episodeNumber,
                 'en'
             );
-            if (!empty($subs)) {
+            if (! empty($subs)) {
                 foreach ($subs as $sub) {
-                    \App\Models\Subtitle::create(['episode_id' => $episode->id] + $sub);
+                    Subtitle::create(['episode_id' => $episode->id] + $sub);
                 }
             }
         }
@@ -199,7 +204,7 @@ public function stream(string $slug, int $episodeNumber)
         // Ads
         $bannerAd = null;
         $user = auth()->user();
-        if (!$user || !$user->isPremium()) {
+        if (! $user || ! $user->isPremium()) {
             $position = AdPosition::where('key', 'episode_overlay')->first();
             if ($position) {
                 $bannerAd = $position->getActiveAd($user);
@@ -211,84 +216,97 @@ public function stream(string $slug, int $episodeNumber)
 
     private function fetchSourcesOnTheFly($anime, $episode): ?string
     {
-        try {
-            $service = app(AnilistVideoSourceService::class);
-            $titles = array_unique(array_filter([
-                $anime->title,
-                $anime->title_english,
-                $anime->title_japanese,
-            ]));
+        $lock = Cache::lock("sources:fetch:{$episode->id}", 60);
+        $acquired = false;
 
-            $result = null;
-            foreach ($titles as $t) {
+        $result = $lock->block(25, function () use (&$acquired, $anime, $episode) {
+            $acquired = true;
+
+            try {
+                if ($episode->sources()->exists()) {
+                    return null;
+                }
+
+                $service = app(AnilistVideoSourceService::class);
+                $title = $anime->title_english ?: $anime->title;
                 $result = $service->fetchEpisodeSources(
-                    (int) ($anime->anilist_id ?? 0), (int) $episode->number, $t
+                    (int) ($anime->anilist_id ?? 0), (int) $episode->number, $title
                 );
-                if (empty($result['error']) && !empty($result['sources'])) {
-                    break;
-                }
-            }
 
-            if (!$result || !empty($result['error']) || empty($result['sources'])) {
-                $err = $result['error'] ?? 'All providers returned no sources';
-                logger()->warning('On-the-fly source fetch failed', [
-                    'anime' => $anime->id, 'episode' => $episode->id, 'titles' => $titles,
-                    'error' => $err,
+                if (! empty($result['error']) || empty($result['sources'])) {
+                    $err = $result['error'] ?? 'All providers returned no sources';
+                    logger()->warning('On-the-fly source fetch failed', [
+                        'anime' => $anime->id, 'episode' => $episode->id, 'title' => $title,
+                        'error' => $err,
+                    ]);
+
+                    return $err;
+                }
+
+                DB::transaction(function () use ($episode, $result) {
+                    $sort = 0;
+                    foreach ($result['sources'] as $s) {
+                        $url = (string) ($s['url'] ?? '');
+                        if ($url === '' || ! $this->isValidSourceUrl($url)) {
+                            continue;
+                        }
+
+                        EpisodeSource::create([
+                            'episode_id' => $episode->id,
+                            'video_server_id' => null,
+                            'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
+                            'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
+                            'url' => $url,
+                            'headers' => $s['headers'] ?? null,
+                            'type' => (string) ($s['type'] ?? 'hls'),
+                            'language' => (string) ($s['language'] ?? 'sub'),
+                            'is_active' => true,
+                            'sort_order' => $sort++,
+                        ]);
+                    }
+
+                    $allowedLangs = ['en', 'ja'];
+                    foreach ($result['subtitles'] ?? [] as $t) {
+                        $filePath = (string) ($t['file_path'] ?? '');
+                        if ($filePath === '') {
+                            continue;
+                        }
+
+                        $lang = (string) ($t['language'] ?? 'en');
+                        if (! in_array($lang, $allowedLangs, true)) {
+                            continue;
+                        }
+
+                        Subtitle::create([
+                            'episode_id' => $episode->id,
+                            'language' => $lang,
+                            'label' => (string) ($t['label'] ?? strtoupper($lang)),
+                            'file_path' => $filePath,
+                            'is_default' => $lang === 'en',
+                        ]);
+                    }
+                });
+
+                return null;
+            } catch (\Exception $e) {
+                logger()->error('On-the-fly source fetch failed: '.$e->getMessage(), [
+                    'anime' => $anime->id, 'episode' => $episode->id,
                 ]);
-                return $err;
+
+                return $e->getMessage();
             }
+        });
 
-            DB::transaction(function () use ($episode, $result) {
-                $sort = 0;
-                foreach ($result['sources'] as $s) {
-                    $url = (string) ($s['url'] ?? '');
-                    if ($url === '' || !$this->isValidSourceUrl($url)) continue;
-
-                    EpisodeSource::create([
-                        'episode_id' => $episode->id,
-                        'video_server_id' => null,
-                        'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
-                        'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
-                        'url' => $url,
-                        'headers' => $s['headers'] ?? null,
-                        'type' => (string) ($s['type'] ?? 'hls'),
-                        'language' => (string) ($s['language'] ?? 'sub'),
-                        'is_active' => true,
-                        'sort_order' => $sort++,
-                    ]);
-                }
-
-                $allowedLangs = ['en', 'ja'];
-                foreach ($result['subtitles'] ?? [] as $t) {
-                    $filePath = (string) ($t['file_path'] ?? '');
-                    if ($filePath === '') continue;
-
-                    $lang = (string) ($t['language'] ?? 'en');
-                    if (!in_array($lang, $allowedLangs, true)) continue;
-
-                    Subtitle::create([
-                        'episode_id' => $episode->id,
-                        'language' => $lang,
-                        'label' => (string) ($t['label'] ?? strtoupper($lang)),
-                        'file_path' => $filePath,
-                        'is_default' => $lang === 'en',
-                    ]);
-                }
-            });
-            return null;
-        } catch (\Exception $e) {
-            logger()->error('On-the-fly source fetch failed: ' . $e->getMessage(), [
-                'anime' => $anime->id, 'episode' => $episode->id,
-            ]);
-            return $e->getMessage();
-        }
+        return $acquired
+            ? $result
+            : 'Sources are being fetched for this episode; please refresh in a few seconds.';
     }
 
     // ─── API-like Actions (for AJAX) ────────────────────────────────────────────
 
     public function rate(Request $request, int $animeId)
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -308,21 +326,23 @@ public function stream(string $slug, int $episodeNumber)
 
     public function favorite(Request $request, int $animeId)
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         $favorite = Favorite::firstOrNew([
             'anime_id' => $animeId,
-            'user_id' => auth()->id()
+            'user_id' => auth()->id(),
         ]);
 
         if ($favorite->exists) {
             $favorite->delete();
+
             return response()->json(['favorited' => false]);
         }
 
         $favorite->save();
+
         return response()->json(['favorited' => true]);
     }
 
@@ -339,7 +359,7 @@ public function stream(string $slug, int $episodeNumber)
 
     public function postComment(Request $request, int $animeId)
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -349,7 +369,7 @@ public function stream(string $slug, int $episodeNumber)
             'user_id' => auth()->id(),
             'anime_id' => $animeId,
             'body' => $request->body,
-            'is_spoiler' => $request->boolean('is_spoiler', false)
+            'is_spoiler' => $request->boolean('is_spoiler', false),
         ]);
 
         return response()->json($comment->load('user'));
@@ -360,12 +380,12 @@ public function stream(string $slug, int $episodeNumber)
     public function genre(string $slug)
     {
         $genre = Genre::where('slug', $slug)->firstOrFail();
-        
+
         $anime = Anime::whereHas('genres', function ($q) use ($genre) {
             $q->where('genres.id', $genre->id);
         })
-        ->orderBy('rating', 'desc')
-        ->paginate(24);
+            ->orderBy('rating', 'desc')
+            ->paginate(24);
 
         return view('anime.genre', compact('genre', 'anime'));
     }
@@ -373,7 +393,7 @@ public function stream(string $slug, int $episodeNumber)
     public function studio(string $slug)
     {
         $studio = Studio::where('slug', $slug)->firstOrFail();
-        
+
         $anime = $studio->anime()
             ->orderBy('aired_year', 'desc')
             ->paginate(24);
@@ -387,7 +407,7 @@ public function stream(string $slug, int $episodeNumber)
             ->orderBy('title')
             ->with(['genres'])
             ->get()
-            ->groupBy(fn($a) => $a->season ? $a->season . ' ' . $a->year : 'Unknown');
+            ->groupBy(fn ($a) => $a->season ? $a->season.' '.$a->year : 'Unknown');
 
         return view('anime.schedule', compact('anime'));
     }
@@ -442,7 +462,7 @@ public function stream(string $slug, int $episodeNumber)
         $url = $source->url;
         $headers = $source->headers ?? [];
 
-        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
             return response('Invalid source URL', 502);
         }
 
@@ -458,8 +478,8 @@ public function stream(string $slug, int $episodeNumber)
 
         if (empty($headers['Referer']) && empty($headers['referer'])) {
             $parsed = parse_url($url);
-            $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-            $defaultHeaders['Referer'] = $origin . '/';
+            $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+            $defaultHeaders['Referer'] = $origin.'/';
         }
 
         $headers = array_merge($defaultHeaders, $headers);
@@ -487,7 +507,7 @@ public function stream(string $slug, int $episodeNumber)
 
             $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8');
 
-            if ($isM3u8 && !$range) {
+            if ($isM3u8 && ! $range) {
                 $body = $bodyStream->getContents();
                 if (empty($body)) {
                     return response('', 502);
@@ -502,6 +522,7 @@ public function stream(string $slug, int $episodeNumber)
                     'Access-Control-Allow-Origin' => '*',
                     'Accept-Ranges' => 'bytes',
                 ]);
+
                 return response($body, 200, $respHeaders);
             }
 
@@ -511,13 +532,17 @@ public function stream(string $slug, int $episodeNumber)
                 'Access-Control-Allow-Origin' => '*',
                 'Accept-Ranges' => 'bytes',
             ]);
-            if ($contentLength) $respHeaders['Content-Length'] = $contentLength;
-            if ($contentRange) $respHeaders['Content-Range'] = $contentRange;
+            if ($contentLength) {
+                $respHeaders['Content-Length'] = $contentLength;
+            }
+            if ($contentRange) {
+                $respHeaders['Content-Range'] = $contentRange;
+            }
 
             $responseStatus = $range ? 206 : 200;
 
             return response()->stream(function () use ($bodyStream) {
-                while (!$bodyStream->eof()) {
+                while (! $bodyStream->eof()) {
                     echo $bodyStream->read(8192);
                     flush();
                 }
@@ -541,12 +566,13 @@ public function stream(string $slug, int $episodeNumber)
                     $path = $line;
                 } elseif (str_starts_with($line, '/')) {
                     $parsed = parse_url($baseUrl);
-                    $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-                    $path = $origin . $line;
+                    $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+                    $path = $origin.$line;
                 } else {
-                    $path = rtrim($baseUrl, '/') . '/' . ltrim($line, './');
+                    $path = rtrim($baseUrl, '/').'/'.ltrim($line, './');
                 }
-                return $proxySegmentUrl . '?path=' . urlencode($path);
+
+                return $proxySegmentUrl.'?path='.urlencode($path);
             },
             $body
         );
@@ -555,7 +581,8 @@ public function stream(string $slug, int $episodeNumber)
             '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
-                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+
+                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri).$m[4];
             },
             $body
         );
@@ -564,7 +591,8 @@ public function stream(string $slug, int $episodeNumber)
             '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
-                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri);
+
+                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri);
             },
             $body
         );
@@ -574,12 +602,13 @@ public function stream(string $slug, int $episodeNumber)
 
     private function isValidSourceUrl(string $url): bool
     {
-        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
             return false;
         }
 
         if (preg_match('/\.(replace|replaceAll|toString|split|join|concat)\(/', $url)) {
             logger()->warning('Filtered out malformed source URL', ['url' => $url]);
+
             return false;
         }
 
@@ -601,10 +630,12 @@ public function stream(string $slug, int $episodeNumber)
         }
         if (str_starts_with($path, '/')) {
             $parsed = parse_url($baseUrl);
-            $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-            return $origin . $path . $query;
+            $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+
+            return $origin.$path.$query;
         }
-        return rtrim($baseUrl, '/') . '/' . ltrim($path, '/') . $query;
+
+        return rtrim($baseUrl, '/').'/'.ltrim($path, '/').$query;
     }
 
     public function proxySegment(Request $request, $sourceId)
@@ -613,7 +644,7 @@ public function stream(string $slug, int $episodeNumber)
 
         $source = EpisodeSource::findOrFail($sourceId);
         $path = $request->query('path');
-        if (!$path) {
+        if (! $path) {
             abort(400, 'Missing path parameter');
         }
 
@@ -625,11 +656,11 @@ public function stream(string $slug, int $episodeNumber)
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
             'Accept' => '*/*',
             'Accept-Language' => 'en-US,en;q=0.9',
-            'Referer' => $baseUrl . '/',
+            'Referer' => $baseUrl.'/',
         ];
-        if (!empty($storedHeaders['Referer'])) {
+        if (! empty($storedHeaders['Referer'])) {
             $defaultHeaders['Referer'] = $storedHeaders['Referer'];
-        } elseif (!empty($storedHeaders['referer'])) {
+        } elseif (! empty($storedHeaders['referer'])) {
             $defaultHeaders['Referer'] = $storedHeaders['referer'];
         }
         $headers = array_merge($defaultHeaders, $storedHeaders);
@@ -641,7 +672,7 @@ public function stream(string $slug, int $episodeNumber)
                 ->toPsrResponse();
 
             if ($psrResponse->getStatusCode() < 200 || $psrResponse->getStatusCode() >= 300) {
-                abort(502, 'Segment fetch failed with status ' . $psrResponse->getStatusCode());
+                abort(502, 'Segment fetch failed with status '.$psrResponse->getStatusCode());
             }
 
             $contentType = $psrResponse->getHeaderLine('Content-Type');
@@ -656,6 +687,7 @@ public function stream(string $slug, int $episodeNumber)
                 }
                 $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
                 $body = $this->rewriteM3u8UrlsForSubPlaylist($body, $proxySegmentUrl, $path, $baseUrl);
+
                 return response($body, 200, [
                     'Content-Type' => 'application/vnd.apple.mpegurl',
                     'Access-Control-Allow-Origin' => '*',
@@ -666,7 +698,7 @@ public function stream(string $slug, int $episodeNumber)
             if ($contentType) {
                 $lower = strtolower($contentType);
                 if (str_contains($lower, 'text/html') || str_contains($lower, 'text/plain')) {
-                    abort(502, 'Invalid segment content type: ' . $contentType);
+                    abort(502, 'Invalid segment content type: '.$contentType);
                 }
             }
 
@@ -677,14 +709,14 @@ public function stream(string $slug, int $episodeNumber)
             ];
 
             return response()->stream(function () use ($bodyStream) {
-                while (!$bodyStream->eof()) {
+                while (! $bodyStream->eof()) {
                     echo $bodyStream->read(8192);
                     flush();
                 }
                 $bodyStream->close();
             }, 200, $respHeaders);
         } catch (\Exception $e) {
-            abort(502, 'Segment fetch error: ' . $e->getMessage());
+            abort(502, 'Segment fetch error: '.$e->getMessage());
         }
     }
 
@@ -697,20 +729,22 @@ public function stream(string $slug, int $episodeNumber)
             '/^(?!#)(\S+)/m',
             function ($m) use ($proxySegmentUrl, $pathDir, $baseUrl) {
                 $line = trim($m[1]);
-                if ($line === '') return $m[0];
+                if ($line === '') {
+                    return $m[0];
+                }
 
                 if (str_starts_with($line, 'http://') || str_starts_with($line, 'https://')) {
                     $fullPath = $line;
                 } elseif (str_starts_with($line, '/')) {
                     $parsed = parse_url($baseUrl);
-                    $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-                    $fullPath = $origin . $line;
+                    $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+                    $fullPath = $origin.$line;
                 } else {
-                    $prefix = ($pathDir && $pathDir !== '.' && $pathDir !== '/') ? $pathDir . '/' : '';
-                    $fullPath = $prefix . ltrim($line, './');
+                    $prefix = ($pathDir && $pathDir !== '.' && $pathDir !== '/') ? $pathDir.'/' : '';
+                    $fullPath = $prefix.ltrim($line, './');
                 }
 
-                return $proxySegmentUrl . '?path=' . urlencode($fullPath);
+                return $proxySegmentUrl.'?path='.urlencode($fullPath);
             },
             $body
         );
@@ -719,7 +753,8 @@ public function stream(string $slug, int $episodeNumber)
             '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
-                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri) . $m[4];
+
+                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri).$m[4];
             },
             $body
         );
@@ -728,7 +763,8 @@ public function stream(string $slug, int $episodeNumber)
             '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
             function ($m) use ($proxySegmentUrl) {
                 $uri = $m[3];
-                return $m[1] . $m[2] . $proxySegmentUrl . '?path=' . urlencode($uri);
+
+                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri);
             },
             $body
         );
@@ -739,7 +775,7 @@ public function stream(string $slug, int $episodeNumber)
     public function proxySubtitle(Request $request)
     {
         $url = $request->query('url');
-        if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! $url || ! filter_var($url, FILTER_VALIDATE_URL)) {
             abort(400, 'Invalid subtitle URL');
         }
 
@@ -749,8 +785,8 @@ public function stream(string $slug, int $episodeNumber)
                 $headers['Referer'] = $referer;
             } else {
                 $parsed = parse_url($url);
-                $origin = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-                $headers['Referer'] = $origin . '/';
+                $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+                $headers['Referer'] = $origin.'/';
             }
             $headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
@@ -758,7 +794,7 @@ public function stream(string $slug, int $episodeNumber)
                 ->timeout(15)
                 ->get($url);
 
-            if (!$resp->successful()) {
+            if (! $resp->successful()) {
                 abort(502, 'Failed to fetch subtitle');
             }
 
@@ -772,7 +808,7 @@ public function stream(string $slug, int $episodeNumber)
                 'Access-Control-Allow-Origin' => '*',
             ]);
         } catch (\Exception $e) {
-            abort(502, 'Subtitle proxy error: ' . $e->getMessage());
+            abort(502, 'Subtitle proxy error: '.$e->getMessage());
         }
     }
 
@@ -780,7 +816,7 @@ public function stream(string $slug, int $episodeNumber)
     {
         $path = storage_path("app/public/subtitles/{$filename}");
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             abort(404);
         }
 
@@ -793,5 +829,4 @@ public function stream(string $slug, int $episodeNumber)
             'Cache-Control' => 'public, max-age=86400',
         ]);
     }
-
 }

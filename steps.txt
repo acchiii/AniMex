@@ -1,0 +1,114 @@
+AniMex deployment steps (Vercel + Neon + separate Consumet server)
+==================================================================
+
+0) Security first
+- The old .env was committed in Git history. Rotate these credentials now:
+  APP_KEY, RECAPTCHA_SECRET_KEY, OPENSUBTITLES_API_KEY, JIMAKU_API_KEY,
+  and the Neon DB password that was pasted in the old .env comment.
+- .env is now untracked and .env.example contains placeholders only.
+- Generate a fresh key with: php artisan key:generate --show
+  Use that value as APP_KEY in Vercel (not in vercel.json).
+
+1) Local preparation
+- Copy .env.example to .env if needed.
+- Local .env must contain: CONSUMET_BASE_URL=http://127.0.0.1:3000
+  (Do NOT use http://localhost:8000/api. That is Laravel calling itself and
+  causes the 60-second timeout.)
+- Start the source scraper: cd consumet-server && npm install && npm start
+- Start Laravel: php artisan serve
+- Check the scraper: http://127.0.0.1:3000/health
+
+2) Deploy the Consumet scraper as its own Vercel project
+- In Vercel, create a new project and select this repository.
+- Set Root Directory to: consumet-server
+- Vercel should detect Express automatically (server.js now exports the app
+  and only listens locally).
+- Set Function Max Duration to 60 seconds in Project Settings > Functions.
+- Deploy, then copy the deployment URL, for example:
+  https://animex-consumet.vercel.app
+- Verify: https://animex-consumet.vercel.app/health returns {"status":"ok"}.
+
+3) Prepare Neon Postgres
+- Create a Neon database.
+- Copy host, port, database, user, and password from the Neon dashboard.
+- Import existing data if you want to keep the current SQLite content.
+- Run migrations once from your machine (not on every Vercel request):
+
+  DB_CONNECTION=pgsql \
+  DB_HOST=your-neon-host \
+  DB_PORT=5432 \
+  DB_DATABASE=neondb \
+  DB_USERNAME=neondb_owner \
+  DB_PASSWORD=your-neon-password \
+  DB_SSLMODE=require \
+  php artisan migrate --force
+
+  On Windows CMD, set the variables first with `set NAME=value`, then run
+  `php artisan migrate --force`.
+
+- New migration 2026_11_26_000001_create_cache_table.php creates the
+  `cache` and `cache_locks` tables. These are required because vercel.json
+  uses CACHE_STORE=database and the source-fetch lock must be shared.
+
+4) Deploy Laravel to Vercel
+- Create another Vercel project from the same GitHub repository.
+- Root Directory: . (repository root)
+- Framework: Other / leave auto-detection off.
+- Build Command and Output Directory are already defined in vercel.json:
+  Build: npm ci && npm run build
+  Output: public
+- Do not change vite.config.js for production. Its server/hmr settings are
+  local-only. The build output remains public/build.
+- Add these Environment Variables in Vercel Dashboard > Environment Variables
+  (Production, Preview, Development as needed). Secrets go here, never in
+  vercel.json:
+
+  APP_KEY=<fresh key from step 0>
+  APP_URL=https://<your-laravel-vercel-domain>.vercel.app
+  DB_CONNECTION=pgsql
+  DB_HOST=<neon-host>
+  DB_PORT=5432
+  DB_DATABASE=<neon-database>
+  DB_USERNAME=<neon-user>
+  DB_PASSWORD=<neon-password>
+  DB_SSLMODE=require
+  CONSUMET_BASE_URL=https://<consumet-project>.vercel.app
+  ANIPUB_BASE_URL=https://anipub.xyz
+  OPENSUBTITLES_API_KEY=<key>
+  JIMAKU_API_KEY=<key>
+  RECAPTCHA_ENABLED=false
+  RECAPTCHA_SITE_KEY=<site-key>
+  RECAPTCHA_SECRET_KEY=<secret-key>
+
+- After the first deployment, replace APP_URL with the real production
+  domain and redeploy so generated URLs are correct.
+
+5) What the committed config now does
+- vercel.json routes /build/(.*) to the Vite-built assets before the Laravel
+  catch-all, so CSS/JS load correctly.
+- maxDuration is 60 seconds. If proxying long video segments gets cut off on
+  Hobby, raise it up to 300 in vercel.json (Hobby maximum in 2026).
+- bootstrap/app.php trusts proxy headers so HTTPS URLs are generated
+  correctly behind Vercel.
+- .vercelignore excludes vendor, node_modules, the local .env, SQLite file,
+  logs, sessions, and compiled views. The community PHP runtime installs
+  Composer dependencies during build.
+- Subtitle VTT files in storage/app/public/subtitles are still deployed and
+  served from the read-only filesystem.
+
+6) Verify after deployment
+- GET /up returns OK.
+- Homepage loads with CSS and JS (check Network tab for 200 responses from
+  /build/assets/...).
+- Open a watch page and confirm no "Could not find video sources" warning.
+- Check Vercel Runtime Logs for cURL 28 / 60-second errors. There should be
+  no requests to localhost:8000/api.
+- Open the same episode on two devices. Only one source fetch should appear
+  in logs because of the database-backed cache lock.
+
+7) Concurrency notes
+- Local `php artisan serve` is single-threaded; use Apache/XAMPP pointed at
+  public/, PHP-FPM, or FrankenPHP when testing multiple users locally.
+- Vercel scales requests automatically, but every long proxy request consumes
+  function duration and DB connections. For heavy traffic, serve video from
+  the provider/CDN directly where possible or move Laravel to a container.

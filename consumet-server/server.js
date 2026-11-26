@@ -269,7 +269,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', providers: PROVIDER_PRIORITY });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Consumet API server running on http://0.0.0.0:${PORT}`);
-  console.log(`Providers: ${PROVIDER_PRIORITY.join(', ')}`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Consumet API server running on http://0.0.0.0:${PORT}`);
+    console.log(`Providers: ${PROVIDER_PRIORITY.join(', ')}`);
+  });
+}
+
+export default app;

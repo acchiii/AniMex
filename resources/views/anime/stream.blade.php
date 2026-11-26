@@ -22,6 +22,8 @@
                 </video>
                 <iframe id="embed-player" class="w-full h-full @if($episode->sources->first()->type !== 'embed') hidden @endif"
                     frameborder="0" allowfullscreen></iframe>
+                <a id="embed-open-link" href="#" target="_blank" rel="noopener noreferrer"
+                    class="hidden absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 text-white text-xs rounded">Open in new tab</a>
                 <div id="play-overlay"
                     class="absolute inset-0 flex items-center justify-center bg-black/60 cursor-pointer hidden"
                     onclick="playVideo()">
@@ -270,8 +272,10 @@
         const STORAGE_KEY_BG = 'animex_sub_bg';
 
         let hls = null;
+        let hlsUsingProxy = false;
         const player = document.getElementById('video-player');
         const embedPlayer = document.getElementById('embed-player');
+        const embedOpenLink = document.getElementById('embed-open-link');
         const playOverlay = document.getElementById('play-overlay');
 
         let activeSubLang = null;
@@ -292,6 +296,7 @@
             if (!src) return;
 
             if (hls) { hls.destroy(); hls = null; }
+            hlsUsingProxy = false;
 
             player.classList.add('hidden');
             embedPlayer.classList.add('hidden');
@@ -301,24 +306,26 @@
             if (src.type === 'embed') {
                 embedPlayer.src = src.url;
                 embedPlayer.classList.remove('hidden');
+                embedOpenLink.href = src.url;
+                embedOpenLink.classList.remove('hidden');
                 document.getElementById('quality-section')?.classList.add('hidden');
                 return;
             }
 
+            embedOpenLink.classList.add('hidden');
             player.classList.remove('hidden');
 
             const proxyUrl = '{{ route("proxy.source", "") }}/' + src.id;
             const isHls = src.type === 'hls' || String(src.url).match(/\.m3u8/i);
 
             if (isHls && Hls.isSupported()) {
+                const needsProxy = Object.keys(src.headers || {}).length > 0;
                 hls = new Hls({
-                    xhrSetup: function (xhr, url) {
+                    xhrSetup: function (xhr) {
+                        if (hlsUsingProxy) return;
                         for (const [key, val] of Object.entries(src.headers || {})) {
                             try { xhr.setRequestHeader(key, val); } catch (e) { }
                         }
-                        try {
-                            xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-                        } catch (e) { }
                     },
                     maxBufferLength: 60,
                     maxMaxBufferLength: 300,
@@ -331,7 +338,8 @@
                     capLevelToPlayerSize: true,
                     backbufferLength: 60,
                 });
-                hls.loadSource(src.url);
+                hlsUsingProxy = needsProxy;
+                hls.loadSource(needsProxy ? proxyUrl : src.url);
                 hls.attachMedia(player);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     buildQualitySelector();
@@ -343,12 +351,12 @@
                     console.warn('HLS error:', data.type, data.details, data.fatal);
                     if (data.fatal) {
                         if (data.details === 'manifestLoadError' || data.details === 'levelLoadError') {
-                            hls.loadSource(proxyUrl);
-                            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                                player.play().catch(function () {
-                                    playOverlay.classList.remove('hidden');
-                                });
-                            });
+                            if (!hlsUsingProxy) {
+                                hlsUsingProxy = true;
+                                hls.loadSource(proxyUrl);
+                            } else {
+                                playOverlay.classList.remove('hidden');
+                            }
                         } else if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
                             hls.startLoad();
                         }

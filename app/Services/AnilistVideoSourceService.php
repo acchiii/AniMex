@@ -3,14 +3,21 @@
 namespace App\Services;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class AnilistVideoSourceService
 {
+    private const LOOKUP_SECONDS = 25;
+
     private string $consumetBaseUrl;
+
     private string $anipubBaseUrl;
+
     private array $infoCache = [];
+
+    private ?float $deadline = null;
 
     public function __construct()
     {
@@ -20,35 +27,52 @@ class AnilistVideoSourceService
 
     public function fetchEpisodeSources(int $anilistId, int $episodeNumber, ?string $animeTitle = null): array
     {
-        $debug = [
-            'anilist_id' => $anilistId,
-            'episode' => $episodeNumber,
-            'used_title' => $animeTitle,
-        ];
+        $cacheKey = 'sources:lookup:'.$anilistId.':'.$episodeNumber.':'.md5((string) $animeTitle);
 
-        $result = $this->tryConsumet($anilistId, $episodeNumber, $animeTitle);
-        if (empty($result['error']) && !empty($result['sources'])) {
-            Log::info('AnilistVideoSource: Found sources via Consumet', $debug);
-            return $result;
-        }
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($anilistId, $episodeNumber, $animeTitle) {
+            $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
 
-        Log::warning('AnilistVideoSource: Consumet failed', array_merge($debug, [
-            'error' => $result['error'] ?? null,
-        ]));
+            $debug = [
+                'anilist_id' => $anilistId,
+                'episode' => $episodeNumber,
+                'used_title' => $animeTitle,
+            ];
 
-        if ($animeTitle) {
-            $result = $this->tryAnipub($animeTitle, $episodeNumber);
-            if (empty($result['error']) && !empty($result['sources'])) {
-                Log::info('AnilistVideoSource: Found sources via AniPub', $debug);
+            $result = $this->tryConsumet($anilistId, $episodeNumber, $animeTitle);
+            if (empty($result['error']) && ! empty($result['sources'])) {
+                Log::info('AnilistVideoSource: Found sources via Consumet', $debug);
+
                 return $result;
             }
+
+            Log::warning('AnilistVideoSource: Consumet failed', array_merge($debug, [
+                'error' => $result['error'] ?? null,
+            ]));
+
+            if ($animeTitle && $this->remainingTimeout(1) > 0) {
+                $result = $this->tryAnipub($animeTitle, $episodeNumber);
+                if (empty($result['error']) && ! empty($result['sources'])) {
+                    Log::info('AnilistVideoSource: Found sources via AniPub', $debug);
+
+                    return $result;
+                }
+            }
+
+            return [
+                'sources' => [], 'subtitles' => [],
+                'error' => "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}",
+                'debug' => $debug,
+            ];
+        });
+    }
+
+    private function remainingTimeout(int $max): int
+    {
+        if ($this->deadline === null) {
+            return $max;
         }
 
-        return [
-            'sources' => [], 'subtitles' => [],
-            'error' => "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}",
-            'debug' => $debug,
-        ];
+        return max(0, min($max, (int) ceil($this->deadline - microtime(true))));
     }
 
     private function fetchInfo(int $anilistId, ?string $animeTitle): array
@@ -59,26 +83,33 @@ class AnilistVideoSourceService
 
         $url = "{$this->consumetBaseUrl}/meta/anilist/info/{$anilistId}";
         if ($animeTitle) {
-            $url .= '?title=' . urlencode($animeTitle);
+            $url .= '?title='.urlencode($animeTitle);
+        }
+
+        $timeout = $this->remainingTimeout(20);
+        if ($timeout <= 0) {
+            throw new \RuntimeException('Source lookup time budget exhausted');
         }
 
         $resp = Http::withHeaders(['Accept' => 'application/json'])
             ->connectTimeout(5)
-            ->timeout(20)
+            ->timeout($timeout)
             ->get($url);
 
-        if (!$resp->ok()) {
+        if (! $resp->ok()) {
             throw new \RuntimeException("Consumet info endpoint returned {$resp->status()}");
         }
 
         $data = $resp->json();
         $this->infoCache[$anilistId] = $data;
+
         return $data;
     }
 
     public function fetchEpisodeList(int $anilistId, ?string $animeTitle = null): array
     {
         try {
+            $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
             $data = $this->fetchInfo($anilistId, $animeTitle);
             $episodes = Arr::get($data, 'episodes', []);
 
@@ -89,7 +120,7 @@ class AnilistVideoSourceService
                 'title' => $data['title'] ?? null,
             ];
         } catch (\Exception $e) {
-            return ['error' => 'Consumet server unreachable: ' . $e->getMessage()];
+            return ['error' => 'Consumet server unreachable: '.$e->getMessage()];
         }
     }
 
@@ -108,22 +139,27 @@ class AnilistVideoSourceService
                 }
             }
 
-            if (!$episodeId) {
+            if (! $episodeId) {
                 return ['sources' => [], 'subtitles' => [], 'error' => "Episode {$episodeNumber} not found in provider's list"];
             }
 
             $provider = Arr::get($info, '_provider');
-            $watchUrl = "{$this->consumetBaseUrl}/meta/anilist/watch/" . urlencode($episodeId);
+            $watchUrl = "{$this->consumetBaseUrl}/meta/anilist/watch/".urlencode($episodeId);
             if ($provider) {
-                $watchUrl .= '?provider=' . urlencode($provider);
+                $watchUrl .= '?provider='.urlencode($provider);
+            }
+
+            $timeout = $this->remainingTimeout(20);
+            if ($timeout <= 0) {
+                return ['sources' => [], 'subtitles' => [], 'error' => 'Source lookup time budget exhausted'];
             }
 
             $watchResp = Http::withHeaders(['Accept' => 'application/json'])
                 ->connectTimeout(5)
-                ->timeout(20)
+                ->timeout($timeout)
                 ->get($watchUrl);
 
-            if (!$watchResp->ok()) {
+            if (! $watchResp->ok()) {
                 return ['sources' => [], 'subtitles' => [], 'error' => "Watch endpoint returned {$watchResp->status()}"];
             }
 
@@ -133,11 +169,13 @@ class AnilistVideoSourceService
             $sources = [];
             foreach (Arr::get($watchData, 'sources', []) as $s) {
                 $url = (string) Arr::get($s, 'url', '');
-                if ($url === '') continue;
+                if ($url === '') {
+                    continue;
+                }
 
                 $quality = (string) Arr::get($s, 'quality', '720p');
-                $quality = is_numeric($quality) ? $quality . 'p' : $quality;
-                if (!in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true)) {
+                $quality = is_numeric($quality) ? $quality.'p' : $quality;
+                if (! in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true)) {
                     $quality = '720p';
                 }
 
@@ -161,11 +199,15 @@ class AnilistVideoSourceService
             ];
             foreach (Arr::get($watchData, 'subtitles', []) as $t) {
                 $url = (string) Arr::get($t, 'url', '');
-                if ($url === '') continue;
+                if ($url === '') {
+                    continue;
+                }
 
                 $lang = (string) Arr::get($t, 'lang', 'en');
 
-                if (!in_array($lang, $allowedLangs, true)) continue;
+                if (! in_array($lang, $allowedLangs, true)) {
+                    continue;
+                }
 
                 $subtitles[] = [
                     'language' => $lang,
@@ -177,33 +219,47 @@ class AnilistVideoSourceService
 
             return compact('sources', 'subtitles') + ['headers' => $headers];
         } catch (\Exception $e) {
-            return ['sources' => [], 'subtitles' => [], 'error' => 'Consumet: ' . $e->getMessage()];
+            return ['sources' => [], 'subtitles' => [], 'error' => 'Consumet: '.$e->getMessage()];
         }
     }
 
     private function findAnipubId(string $title): int
     {
+        $findTimeout = $this->remainingTimeout(10);
+        if ($findTimeout <= 0) {
+            return 0;
+        }
+
         $findResp = Http::withHeaders(['Accept' => 'application/json'])
             ->connectTimeout(3)
-            ->timeout(10)
-            ->get("{$this->anipubBaseUrl}/api/find/" . urlencode($title));
+            ->timeout($findTimeout)
+            ->get("{$this->anipubBaseUrl}/api/find/".urlencode($title));
 
         if ($findResp->ok()) {
             $found = $findResp->json();
-            if (($found['exist'] ?? false) && !empty($found['id'])) {
+            if (($found['exist'] ?? false) && ! empty($found['id'])) {
                 return (int) $found['id'];
             }
         }
 
+        $searchTimeout = $this->remainingTimeout(10);
+        if ($searchTimeout <= 0) {
+            return 0;
+        }
+
         $searchResp = Http::withHeaders(['Accept' => 'application/json'])
             ->connectTimeout(3)
-            ->timeout(10)
-            ->get("{$this->anipubBaseUrl}/api/search/" . urlencode($title));
+            ->timeout($searchTimeout)
+            ->get("{$this->anipubBaseUrl}/api/search/".urlencode($title));
 
-        if (!$searchResp->ok()) return 0;
+        if (! $searchResp->ok()) {
+            return 0;
+        }
 
         $body = $searchResp->json();
-        if (empty($body) || isset($body['found']) && $body['found'] === false) return 0;
+        if (empty($body) || isset($body['found']) && $body['found'] === false) {
+            return 0;
+        }
 
         if (isset($body['Id'])) {
             return (int) $body['Id'];
@@ -215,9 +271,13 @@ class AnilistVideoSourceService
             $bestScore = 0;
 
             foreach ($body as $r) {
-                if (!is_array($r)) continue;
+                if (! is_array($r)) {
+                    continue;
+                }
                 $name = (string) ($r['Name'] ?? '');
-                if ($name === '') continue;
+                if ($name === '') {
+                    continue;
+                }
 
                 similar_text($titleLower, mb_strtolower($name), $score);
                 if ($score > $bestScore) {
@@ -240,12 +300,17 @@ class AnilistVideoSourceService
                 return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub: anime not found'];
             }
 
+            $streamTimeout = $this->remainingTimeout(10);
+            if ($streamTimeout <= 0) {
+                return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub time budget exhausted'];
+            }
+
             $streamResp = Http::withHeaders(['Accept' => 'application/json'])
                 ->connectTimeout(3)
-                ->timeout(10)
+                ->timeout($streamTimeout)
                 ->get("{$this->anipubBaseUrl}/v1/api/details/{$anipubId}");
 
-            if (!$streamResp->ok()) {
+            if (! $streamResp->ok()) {
                 return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub stream fetch failed'];
             }
 
@@ -261,11 +326,11 @@ class AnilistVideoSourceService
                 $epLink = isset($epArray[$epIndex]) ? (string) Arr::get($epArray[$epIndex], 'link', '') : null;
             }
 
-            if (!$epLink) {
+            if (! $epLink) {
                 return ['sources' => [], 'subtitles' => [], 'error' => "AniPub: episode {$episodeNumber} not found"];
             }
 
-            $epLink = ltrim($epLink, 'src=');
+            $epLink = preg_replace('/^src=/', '', $epLink);
 
             $sources[] = [
                 'label' => 'AniPub',
@@ -280,7 +345,7 @@ class AnilistVideoSourceService
 
             return ['sources' => $sources, 'subtitles' => [], 'headers' => []];
         } catch (\Exception $e) {
-            return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub error: ' . $e->getMessage()];
+            return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub error: '.$e->getMessage()];
         }
     }
 }
