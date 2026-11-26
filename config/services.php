@@ -9,7 +9,7 @@ return [
     ],
 
     'consumet' => [
-        'base_url' => env('CONSUMET_BASE_URL', 'http://localhost:3000'),
+        'base_url' => env('CONSUMET_BASE_URL', 'https://animex-consumet.vercel.app'),
     ],
 
     'anipub' => [
