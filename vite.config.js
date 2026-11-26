@@ -28,7 +28,7 @@ export default defineConfig({
         cors: true,
 
         hmr: {
-            host: '127.0.0.1',
+            host: 'https://ani-mex.vercel.app',
         },
     },
 
