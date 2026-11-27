@@ -21239,3 +21239,6 @@ DETAIL:  Key (slug)=(madhouse) already exists. at C:/xampp/htdocs/AniMex/vendor/
 [2026-11-27 09:42:11] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":136,"episode":1} 
 [2026-11-27 09:55:05] local.WARNING: Jimaku search failed {"anilist_id":176496,"status":400} 
 [2026-11-27 09:55:41] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":176496,"episode":1} 
+[2026-11-27 11:02:34] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
+[2026-11-27 11:03:16] local.WARNING: Anivexa request failed {"url":"http://localhost:4000/watch/animegg/130298/sub/animegg-2","error":"cURL error 28: Operation timed out after 12013 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://localhost:4000/watch/animegg/130298/sub/animegg-2"} 
+[2026-11-27 11:03:20] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":130298,"episode":2} 
