@@ -96,7 +96,7 @@ class AniListCatalogService
                     endDate { year month day }
                     episodes
                     duration
-                    rating
+                    isAdult
                     source
                     averageScore
                     popularity
@@ -151,7 +151,7 @@ class AniListCatalogService
             'aired_to' => $endDate,
             'episodes_count' => $data['episodes'] ?? null,
             'episode_duration' => $data['duration'] ?? null,
-            'rating' => $this->mapRating($data['rating'] ?? ''),
+            'rating' => $this->mapRating(! empty($data['isAdult']) ? 'RX' : ''),
             'source' => $data['source'] ?? null,
             'score' => $score !== null ? round(((int) $score) / 10, 2) : 0,
             'score_count' => 0,
@@ -186,15 +186,15 @@ class AniListCatalogService
                 'variables' => $variables,
             ]);
 
-            if (! $response->ok()) {
-                $this->lastError = 'AniList returned HTTP '.$response->status();
+            $json = $response->json();
+            if (! empty($json['errors'][0]['message'])) {
+                $this->lastError = 'AniList GraphQL: '.$json['errors'][0]['message'];
 
                 return null;
             }
 
-            $json = $response->json();
-            if (! empty($json['errors'][0]['message'])) {
-                $this->lastError = 'AniList GraphQL: '.$json['errors'][0]['message'];
+            if (! $response->ok()) {
+                $this->lastError = 'AniList returned HTTP '.$response->status();
 
                 return null;
             }

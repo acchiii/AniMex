@@ -1,5 +1,3 @@
-
-
 <?php $__env->startSection('title', 'Import Anime'); ?>
 <?php $__env->startSection('page-title', 'Import from Jikan/MyAnimeList'); ?>
 

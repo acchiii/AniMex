@@ -107,26 +107,38 @@ GQL;
         return view('admin.jikan.search', compact('parsed', 'query', 'page', 'source', 'error'));
     }
 
-    public function import(int $malId)
+    public function import(Request $request, int $malId)
     {
-        $data = $this->jikan->getAnime($malId);
+        $directAnilistId = (int) $request->input('anilist_id', 0);
         $source = 'Jikan';
 
-        if (! $data) {
-            $jikanError = $this->jikan->lastError();
+        if ($directAnilistId > 0) {
             $media = $this->anilist->getByMalId($malId);
-
             if (! $media) {
-                $anilistError = $this->anilist->lastError();
-                $detail = trim('Jikan: '.$jikanError.' | AniList: '.$anilistError);
-
-                return redirect()->back()->with('error', 'Failed to fetch anime data. '.$detail);
+                return redirect()->back()->with('error', 'Failed to fetch anime data. AniList: '.$this->anilist->lastError());
             }
 
             $parsed = $this->anilist->parseAnimeData($media, $malId);
             $source = 'AniList';
         } else {
-            $parsed = $this->jikan->parseAnimeData($data);
+            $data = $this->jikan->getAnime($malId);
+
+            if (! $data) {
+                $jikanError = $this->jikan->lastError();
+                $media = $this->anilist->getByMalId($malId);
+
+                if (! $media) {
+                    $anilistError = $this->anilist->lastError();
+                    $detail = trim('Jikan: '.$jikanError.' | AniList: '.$anilistError);
+
+                    return redirect()->back()->with('error', 'Failed to fetch anime data. '.$detail);
+                }
+
+                $parsed = $this->anilist->parseAnimeData($media, $malId);
+                $source = 'AniList';
+            } else {
+                $parsed = $this->jikan->parseAnimeData($data);
+            }
         }
 
         $existing = Anime::where('mal_id', $malId)->first();
