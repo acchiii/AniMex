@@ -9,13 +9,22 @@
         @endif
         <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4 relative" id="player-container">
             @if($episode->sources->count())
+                @php
+                    $subtitleSource = $episode->sources->first(fn($s) => !empty($s->headers));
+                    $subtitleSourceId = $subtitleSource->id ?? $episode->sources->first()?->id;
+                @endphp
                 <video id="video-player" class="w-full h-full @if($episode->sources->first()->type === 'embed') hidden @endif"
                     controls preload="metadata">
                     @foreach($episode->subtitles as $sub)
                         @php
                             $subParsed = parse_url($sub->file_path);
                             $isExternal = $subParsed && isset($subParsed['host']) && $subParsed['host'] !== request()->getHost();
-                            $subUrl = $isExternal ? route('proxy.subtitle', ['url' => $sub->file_path]) : $sub->file_path;
+                            $subUrl = $isExternal
+                                ? route('proxy.subtitle', array_filter([
+                                    'url' => $sub->file_path,
+                                    'source' => $subtitleSourceId,
+                                ]))
+                                : $sub->file_path;
                         @endphp
                         <track kind="subtitles" src="{{ $subUrl }}" srclang="{{ $sub->language }}" label="{{ $sub->label }}" @if($sub->is_default) default @endif>
                     @endforeach
@@ -254,8 +263,6 @@
             'headers' => $s->headers ?? [],
         ])->values()->all();
 
-        $subtitleSource = $episode->sources->first(fn($s) => !empty($s->headers));
-        $subtitleSourceId = $subtitleSource->id ?? $episode->sources->first()?->id;
         $proxySubtitleUrl = route('proxy.subtitle');
         $subtitlesData = $episode->subtitles->map(fn($s) => [
             'language' => $s->language,

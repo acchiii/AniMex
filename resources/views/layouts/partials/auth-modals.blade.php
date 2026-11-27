@@ -146,6 +146,7 @@ function switchToRegister() {
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const form = this;
+    if (!window.setPendingForm(form)) return;
     const errorEl = document.getElementById('login-error');
     errorEl.classList.add('hidden');
 
@@ -176,6 +177,8 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
             errorEl.textContent = 'Something went wrong. Please try again.';
             errorEl.classList.remove('hidden');
         });
+    }).finally(function () {
+        window.clearPendingForm(form);
     });
 });
 

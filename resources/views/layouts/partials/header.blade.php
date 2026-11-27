@@ -14,7 +14,7 @@
 
             {{-- Right: Search + Auth + Theme + Hamburger --}}
             <div class="flex items-center gap-3 shrink-0">
-                <form method="GET" action="{{ route('anime.index') }}" class="relative">
+                <form method="GET" action="{{ route('anime.index') }}" class="relative" onsubmit="return window.setPendingForm(this)">
                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                     <input type="search" name="search" placeholder="Search..." value="{{ request('search') }}" class="w-36 sm:w-48 lg:w-56 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-gray-700/50 rounded-full pl-9 pr-4 py-1.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition">
                 </form>

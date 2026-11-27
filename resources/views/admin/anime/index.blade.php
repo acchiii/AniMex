@@ -15,7 +15,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">Manage your anime catalog</p>
         </div>
 
-        <form method="GET" action="{{ route('admin.anime.index') }}" class="flex items-center gap-2">
+        <form method="GET" action="{{ route('admin.anime.index') }}" class="flex items-center gap-2" onsubmit="return window.setPendingForm(this)">
             <input
                 type="text"
                 name="q"

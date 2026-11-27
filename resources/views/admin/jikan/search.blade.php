@@ -8,7 +8,7 @@
 @endsection
 
 @section('content')
-<form action="{{ route('admin.import.search') }}" method="GET" class="mb-6">
+<form action="{{ route('admin.import.search') }}" method="GET" class="mb-6" onsubmit="return window.setPendingForm(this)">
     <div class="flex gap-3">
         <input
             type="text"
@@ -52,7 +52,7 @@
                             {{ $item['type'] }} &middot; {{ $item['episodes'] }} eps &middot; Score: {{ $item['score'] }} &middot; {{ $item['status'] }}
                         </p>
                     </div>
-                    <form action="{{ route('admin.import.anime', $item['mal_id']) }}" method="POST">
+                    <form action="{{ route('admin.import.anime', $item['mal_id']) }}" method="POST" onsubmit="return window.setPendingForm(this)">
                         @csrf
                         @if(($source ?? 'jikan') === 'anilist' && ! empty($item['anilist_id']))
                             <input type="hidden" name="anilist_id" value="{{ $item['anilist_id'] }}">

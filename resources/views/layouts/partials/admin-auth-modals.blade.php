@@ -12,7 +12,7 @@
             </div>
 
             <div class="p-6">
-action="{{ route('admin.login.post') }}"
+                <form method="POST" action="{{ route('admin.login.post') }}" onsubmit="return window.setPendingForm(this)">
                     @csrf
                     <div class="space-y-4">
                         <div>

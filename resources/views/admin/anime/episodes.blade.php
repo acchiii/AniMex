@@ -65,13 +65,13 @@
         @if($anime->anilist_id)
             <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">AniList ID: {{ $anime->anilist_id }}</span>
-                <form action="{{ route('admin.anime.fetch-episode-list', $anime) }}" method="POST" class="inline">
+                <form action="{{ route('admin.anime.fetch-episode-list', $anime) }}" method="POST" class="inline" onsubmit="return window.setPendingForm(this)">
                     @csrf
                     <button type="submit" class="text-xs bg-purple-600 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
                         Fetch Episodes
                     </button>
                 </form>
-                <form action="{{ route('admin.anime.import-all-sources', $anime) }}" method="POST" class="inline" onsubmit="return confirm('Import sources for ALL episodes without sources? This may take a while.')">
+                <form action="{{ route('admin.anime.import-all-sources', $anime) }}" method="POST" class="inline" onsubmit="return confirm('Import sources for ALL episodes without sources? This may take a while.') && window.setPendingForm(this)">
                     @csrf
                     <button type="submit" class="text-xs bg-green-600 hover:bg-green-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
                         Import All Sources
@@ -125,7 +125,7 @@
                     </div>
                     <div class="flex items-center gap-1">
                         @if($anime->anilist_id)
-                            <form action="{{ route('admin.anime.episodes.import-sources', [$anime, $ep]) }}" method="POST" class="inline">
+                            <form action="{{ route('admin.anime.episodes.import-sources', [$anime, $ep]) }}" method="POST" class="inline" onsubmit="return window.setPendingForm(this)">
                                 @csrf
                                 <button type="submit" class="text-xs bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition font-medium text-white">
                                     Import

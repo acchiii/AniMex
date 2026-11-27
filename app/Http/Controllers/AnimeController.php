@@ -59,7 +59,7 @@ class AnimeController extends Controller
         }
 
         if ($request->has('year') && $request->year) {
-            $query->where('aired_year', $request->year);
+            $query->where('year', $request->year);
         }
 
         if ($request->has('search') && $request->search) {
@@ -72,7 +72,7 @@ class AnimeController extends Controller
         // Sorting
         $sortBy = $request->get('sort', 'created_at');
         $sortOrder = $request->get('order', 'desc');
-        $allowedSorts = ['title', 'aired_year', 'rating', 'views_count', 'created_at'];
+        $allowedSorts = ['title', 'year', 'rating', 'views_count', 'created_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
@@ -402,7 +402,7 @@ class AnimeController extends Controller
         $studio = Studio::where('slug', $slug)->firstOrFail();
 
         $anime = $studio->anime()
-            ->orderBy('aired_year', 'desc')
+            ->orderBy('year', 'desc')
             ->paginate(24);
 
         return view('anime.studio', compact('studio', 'anime'));
@@ -665,7 +665,7 @@ class AnimeController extends Controller
             return $url;
         }
 
-        if (! preg_match('#/seg-\d+-[^/]+\.(?:jpe?g|html?|js|css|txt|png|webp|gif)$#i', $parsed['path'])) {
+        if (! preg_match('#/seg-[^/]+\.(?:jpe?g|html?|js|css|txt|png|webp|gif)$#i', $parsed['path'])) {
             return $url;
         }
 
@@ -855,6 +855,10 @@ class AnimeController extends Controller
             $source = EpisodeSource::find($request->query('source'));
             if ($source && is_array($source->headers)) {
                 $referer = $source->headers['Referer'] ?? $source->headers['referer'] ?? null;
+            }
+
+            if (! $referer) {
+                $referer = $request->headers->get('referer') ?: null;
             }
 
             if (! $referer) {

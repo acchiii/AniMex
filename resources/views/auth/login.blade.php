@@ -15,6 +15,7 @@ function executeLoginCaptcha(form) {
                 form.appendChild(hiddenInput);
             }
             hiddenInput.value = token;
+            if (!window.setPendingForm(form)) return;
             form.submit();
         });
     });
@@ -34,7 +35,7 @@ function executeLoginCaptcha(form) {
             </div>
         @endif
 
-        <form method="POST" action="{{ route('login') }}" class="space-y-4" @if(config('services.recaptcha.enabled')) onsubmit="event.preventDefault(); executeLoginCaptcha(this);" @endif>
+        <form method="POST" action="{{ route('login') }}" class="space-y-4" onsubmit="{{ config('services.recaptcha.enabled') ? 'event.preventDefault(); executeLoginCaptcha(this);' : 'return window.setPendingForm(this);' }}">
 
             @csrf
 
