@@ -7,20 +7,25 @@ use App\Models\Anime;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\Studio;
-use App\Models\Tag;
+use App\Services\AniListCatalogService;
 use App\Services\AnilistVideoSourceService;
 use App\Services\JikanService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class AdminJikanController extends Controller
 {
     protected JikanService $jikan;
 
-    public function __construct(JikanService $jikan)
+    protected AniListCatalogService $anilist;
+
+    public function __construct(JikanService $jikan, AniListCatalogService $anilist)
     {
         $this->jikan = $jikan;
+        $this->anilist = $anilist;
     }
 
     private function lookupAnilistId(int $malId): ?int
@@ -42,9 +47,12 @@ GQL;
                 'variables' => ['idMal' => $malId],
             ]);
 
-            if (!$resp->ok()) return null;
+            if (! $resp->ok()) {
+                return null;
+            }
 
             $json = $resp->json();
+
             return $json['data']['Media']['id'] ?? null;
         } catch (\Exception $e) {
             return null;
@@ -61,9 +69,29 @@ GQL;
         }
 
         $results = $this->jikan->searchAnime($query, $page, 20);
+        $jikanError = $this->jikan->lastError();
+        $source = 'jikan';
+        $error = null;
+
+        if ($jikanError !== null && empty($results)) {
+            $results = $this->anilist->search($query, $page, 20);
+            $anilistError = $this->anilist->lastError();
+
+            if ($anilistError !== null) {
+                $error = 'Jikan: '.$jikanError.' | AniList: '.$anilistError;
+            } else {
+                $source = 'anilist';
+            }
+        }
 
         $parsed = [];
         foreach ($results as $item) {
+            if (array_key_exists('anilist_id', $item)) {
+                $parsed[] = $item;
+
+                continue;
+            }
+
             $parsed[] = [
                 'mal_id' => $item['mal_id'],
                 'title' => $item['title'],
@@ -76,17 +104,30 @@ GQL;
             ];
         }
 
-        return view('admin.jikan.search', compact('parsed', 'query', 'page'));
+        return view('admin.jikan.search', compact('parsed', 'query', 'page', 'source', 'error'));
     }
 
     public function import(int $malId)
     {
         $data = $this->jikan->getAnime($malId);
-        if (!$data) {
-            return redirect()->back()->with('error', 'Failed to fetch anime data.');
-        }
+        $source = 'Jikan';
 
-        $parsed = $this->jikan->parseAnimeData($data);
+        if (! $data) {
+            $jikanError = $this->jikan->lastError();
+            $media = $this->anilist->getByMalId($malId);
+
+            if (! $media) {
+                $anilistError = $this->anilist->lastError();
+                $detail = trim('Jikan: '.$jikanError.' | AniList: '.$anilistError);
+
+                return redirect()->back()->with('error', 'Failed to fetch anime data. '.$detail);
+            }
+
+            $parsed = $this->anilist->parseAnimeData($media, $malId);
+            $source = 'AniList';
+        } else {
+            $parsed = $this->jikan->parseAnimeData($data);
+        }
 
         $existing = Anime::where('mal_id', $malId)->first();
         if ($existing) {
@@ -95,13 +136,13 @@ GQL;
 
         $existingBySlug = Anime::where('slug', $parsed['slug'])->first();
         if ($existingBySlug) {
-            $parsed['slug'] = $parsed['slug'] . '-' . $malId;
+            $parsed['slug'] = $parsed['slug'].'-'.$malId;
         }
 
         $studioId = null;
-        if (!empty($parsed['studios'])) {
+        if (! empty($parsed['studios'])) {
             $studio = Studio::firstOrCreate(['name' => $parsed['studios'][0]['name']], [
-                'slug' => \Illuminate\Support\Str::slug($parsed['studios'][0]['name']),
+                'slug' => Str::slug($parsed['studios'][0]['name']),
             ]);
             $studioId = $studio->id;
         }
@@ -139,23 +180,25 @@ GQL;
         while ($anime === null) {
             try {
                 $anime = Anime::create($animeData);
-            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            } catch (UniqueConstraintViolationException $e) {
                 $slugAttempt++;
-                if ($slugAttempt > 10) throw $e;
-                $animeData['slug'] = $parsed['slug'] . '-' . $malId . ($slugAttempt > 1 ? '-' . $slugAttempt : '');
+                if ($slugAttempt > 10) {
+                    throw $e;
+                }
+                $animeData['slug'] = $parsed['slug'].'-'.$malId.($slugAttempt > 1 ? '-'.$slugAttempt : '');
             }
         }
 
         $genreIds = [];
         foreach ($parsed['genres'] as $genreData) {
             $genre = Genre::firstOrCreate(['name' => $genreData['name']], [
-                'slug' => \Illuminate\Support\Str::slug($genreData['name']),
+                'slug' => Str::slug($genreData['name']),
             ]);
             $genreIds[] = $genre->id;
         }
         $anime->genres()->sync($genreIds);
 
-        $anilistId = $this->lookupAnilistId($malId);
+        $anilistId = (int) ($parsed['anilist_id'] ?? 0) ?: $this->lookupAnilistId($malId);
         if ($anilistId) {
             $anime->anilist_id = $anilistId;
             $anime->save();
@@ -170,8 +213,12 @@ GQL;
 
                     foreach ($episodesData as $ep) {
                         $number = (int) ($ep['number'] ?? 0);
-                        if ($number <= 0) continue;
-                        if ($anime->episodes()->where('number', $number)->exists()) continue;
+                        if ($number <= 0) {
+                            continue;
+                        }
+                        if ($anime->episodes()->where('number', $number)->exists()) {
+                            continue;
+                        }
 
                         Episode::create([
                             'anime_id' => $anime->id,
@@ -205,6 +252,6 @@ GQL;
         Cache::forget('genre_sections');
         Cache::forget('upcoming_anime');
 
-        return redirect()->route('admin.anime.edit', $anime)->with('success', 'Anime imported from Jikan successfully.');
+        return redirect()->route('admin.anime.edit', $anime)->with('success', "Anime imported from {$source} successfully.");
     }
 }

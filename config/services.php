@@ -16,6 +16,14 @@ return [
         'base_url' => env('ANIPUB_BASE_URL', 'https://anipub.xyz'),
     ],
 
+    'jikan' => [
+        'base_url' => env('JIKAN_BASE_URL', 'https://api.jikan.moe/v4'),
+    ],
+
+    'anilist' => [
+        'graphql_url' => env('ANILIST_GRAPHQL_URL', 'https://graphql.anilist.co'),
+    ],
+
     'opensubtitles' => [
         'api_key' => env('OPENSUBTITLES_API_KEY', ''),
     ],

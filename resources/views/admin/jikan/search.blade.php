@@ -22,6 +22,17 @@
     </div>
 </form>
 
+@if(! empty($error))
+    <div class="mb-6 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-200">
+        <p class="font-semibold">Both anime catalogs failed.</p>
+        <p class="mt-1 break-words">{{ $error }}</p>
+    </div>
+@elseif(isset($query) && ($source ?? 'jikan') === 'anilist')
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-200">
+        Jikan is unavailable; showing AniList results instead.
+    </div>
+@endif
+
 @if(isset($parsed) && count($parsed) > 0)
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         <div class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -49,7 +60,7 @@
             @endforeach
         </div>
     </div>
-@elseif(isset($query))
+@elseif(isset($query) && empty($error))
     <div class="text-center py-16 text-gray-600 dark:text-gray-400">
         <p class="text-lg">No results found for "{{ $query }}".</p>
     </div>
