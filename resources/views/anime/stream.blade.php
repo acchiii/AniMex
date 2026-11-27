@@ -254,15 +254,20 @@
             'headers' => $s->headers ?? [],
         ])->values()->all();
 
+        $subtitleSource = $episode->sources->first(fn($s) => !empty($s->headers));
+        $subtitleSourceId = $subtitleSource->id ?? $episode->sources->first()?->id;
         $proxySubtitleUrl = route('proxy.subtitle');
         $subtitlesData = $episode->subtitles->map(fn($s) => [
             'language' => $s->language,
             'label' => $s->label,
             'file_path' => $s->file_path,
-            'proxy_path' => (function ($url) use ($proxySubtitleUrl) {
+            'proxy_path' => (function ($url) use ($proxySubtitleUrl, $subtitleSourceId) {
                 $parsed = parse_url($url);
                 return ($parsed && isset($parsed['host']) && $parsed['host'] !== request()->getHost())
-                    ? $proxySubtitleUrl . '?url=' . urlencode($url)
+                    ? $proxySubtitleUrl . '?' . http_build_query(array_filter([
+                        'url' => $url,
+                        'source' => $subtitleSourceId,
+                    ]))
                     : $url;
             })($s->file_path),
         ])->values()->all();
@@ -370,26 +375,27 @@
                     lowLatencyMode: false,
                     capLevelToPlayerSize: true,
                     backBufferLength: 60,
+                    startLevel: 0,
                     manifestLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 15000,
-                            maxLoadTimeMs: 60000,
+                            maxTimeToFirstByteMs: 30000,
+                            maxLoadTimeMs: 120000,
                             timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
                             errorRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },
                     },
                     playlistLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 15000,
-                            maxLoadTimeMs: 60000,
+                            maxTimeToFirstByteMs: 30000,
+                            maxLoadTimeMs: 180000,
                             timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
                             errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },
                     },
                     fragLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 20000,
-                            maxLoadTimeMs: 120000,
+                            maxTimeToFirstByteMs: 60000,
+                            maxLoadTimeMs: 240000,
                             timeoutRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                             errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },

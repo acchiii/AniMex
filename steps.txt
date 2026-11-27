@@ -86,8 +86,8 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
 5) What the committed config now does
 - vercel.json routes /build/(.*) to the Vite-built assets before the Laravel
   catch-all, so CSS/JS load correctly.
-- maxDuration is 60 seconds. If proxying long video segments gets cut off on
-  Hobby, raise it up to 300 in vercel.json (Hobby maximum in 2026).
+- maxDuration is 300 seconds so large HLS segments are not cut off mid-fetch.
+  The Laravel segment proxy uses a 120-second upstream timeout.
 - bootstrap/app.php trusts proxy headers so HTTPS URLs are generated
   correctly behind Vercel.
 - .vercelignore excludes vendor, node_modules, the local .env, SQLite file,
@@ -104,8 +104,8 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
 - Homepage loads with CSS and JS (check Network tab for 200 responses from
   /build/assets/...).
 - Open a watch page and confirm no "Could not find video sources" warning.
-- Check Vercel Runtime Logs for cURL 28 / 60-second errors. There should be
-  no requests to localhost:8000/api.
+- Check Vercel Runtime Logs for cURL 28 / timeout errors. There should be no
+  requests to localhost:8000/api.
 - Open the same episode on two devices. Only one source fetch should appear
   in logs because of the database-backed cache lock.
 

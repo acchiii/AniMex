@@ -658,9 +658,31 @@ class AnimeController extends Controller
         return rtrim($baseUrl, '/').'/'.ltrim($path, '/').$query;
     }
 
+    private function normalizeSegmentUrl(string $url): string
+    {
+        $parsed = parse_url($url);
+        if (! is_array($parsed) || empty($parsed['path'])) {
+            return $url;
+        }
+
+        if (! preg_match('#/seg-\d+-[^/]+\.(?:jpe?g|html?|js|css|txt|png|webp|gif)$#i', $parsed['path'])) {
+            return $url;
+        }
+
+        $parsed['path'] = (string) preg_replace('/\.[^.\/]+$/', '.ts', $parsed['path']);
+
+        $scheme = isset($parsed['scheme']) ? $parsed['scheme'].'://' : '';
+        $host = (string) ($parsed['host'] ?? '');
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
+        $fragment = isset($parsed['fragment']) ? '#'.$parsed['fragment'] : '';
+
+        return $scheme.$host.$port.$parsed['path'].$query.$fragment;
+    }
+
     public function proxySegment(Request $request, $sourceId)
     {
-        @set_time_limit(120);
+        @set_time_limit(240);
 
         $source = EpisodeSource::findOrFail($sourceId);
         $path = $request->query('path');
@@ -670,6 +692,7 @@ class AnimeController extends Controller
 
         $baseUrl = dirname($source->url);
         $segmentUrl = $this->resolveSegmentUrl($baseUrl, $path);
+        $fetchUrls = array_values(array_unique([$this->normalizeSegmentUrl($segmentUrl), $segmentUrl]));
 
         $storedHeaders = $source->headers ?? [];
         $defaultHeaders = [
@@ -686,13 +709,33 @@ class AnimeController extends Controller
         $headers = array_merge($defaultHeaders, $storedHeaders);
 
         try {
-            $psrResponse = Http::withHeaders($headers)
-                ->timeout(30)
-                ->send('GET', $segmentUrl, ['stream' => true])
-                ->toPsrResponse();
+            $psrResponse = null;
+            $lastError = 'Segment fetch failed';
 
-            if ($psrResponse->getStatusCode() < 200 || $psrResponse->getStatusCode() >= 300) {
-                abort(502, 'Segment fetch failed with status '.$psrResponse->getStatusCode());
+            foreach ($fetchUrls as $fetchUrl) {
+                try {
+                    $candidate = Http::withHeaders($headers)
+                        ->connectTimeout(10)
+                        ->timeout(120)
+                        ->send('GET', $fetchUrl, ['stream' => true])
+                        ->toPsrResponse();
+
+                    $status = $candidate->getStatusCode();
+                    if ($status >= 200 && $status < 300) {
+                        $psrResponse = $candidate;
+
+                        break;
+                    }
+
+                    $lastError = 'Segment fetch failed with status '.$status;
+                    $candidate->getBody()->close();
+                } catch (\Throwable $e) {
+                    $lastError = 'Segment fetch error: '.$e->getMessage();
+                }
+            }
+
+            if (! $psrResponse) {
+                abort(502, $lastError);
             }
 
             $contentType = $psrResponse->getHeaderLine('Content-Type');
@@ -808,18 +851,24 @@ class AnimeController extends Controller
         }
 
         try {
-            $headers = [];
-            if ($referer = $request->header('Referer')) {
-                $headers['Referer'] = $referer;
-            } else {
-                $parsed = parse_url($url);
-                $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
-                $headers['Referer'] = $origin.'/';
+            $referer = null;
+            $source = EpisodeSource::find($request->query('source'));
+            if ($source && is_array($source->headers)) {
+                $referer = $source->headers['Referer'] ?? $source->headers['referer'] ?? null;
             }
-            $headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+            if (! $referer) {
+                $parsed = parse_url($url);
+                $referer = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '').'/';
+            }
+
+            $headers = [
+                'Referer' => $referer,
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            ];
 
             $resp = Http::withHeaders($headers)
-                ->timeout(15)
+                ->timeout(30)
                 ->get($url);
 
             if (! $resp->successful()) {
