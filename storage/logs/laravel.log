@@ -20569,3 +20569,7 @@ DETAIL:  Failing row contains (42, Naruto Shippuden, Naruto Shippuden, ナルト
 [2026-11-27 03:10:37] local.WARNING: Homepage data lookup failed {"context":"home_ads","error":"SQLSTATE[08006] [7] could not connect to server: Connection refused (0x0000274D/10061)
 \tIs the server running on host \"127.0.0.1\" and accepting
 \tTCP/IP connections on port 9? (Connection: pgsql, SQL: select * from \"ad_positions\" where \"key\" in (homepage_hero_banner, homepage_sidebar, homepage_in_feed))"} 
+[2026-11-27 03:55:45] local.WARNING: Jimaku search failed {"anilist_id":145064,"status":400} 
+[2026-11-27 03:55:48] local.WARNING: OpenSubtitles download failed {"file_id":5576610,"status":406} 
+[2026-11-27 03:56:03] local.WARNING: AnilistVideoSource: Consumet failed {"anilist_id":145064,"episode":1,"error":"Episode 1 not found in provider's list"} 
+[2026-11-27 03:56:03] local.WARNING: On-the-fly source fetch failed {"anime":31,"episode":2217,"title":"Jujutsu Kaisen 2nd Season","error":"No sources found for AniList ID 145064, episode 1"} 
