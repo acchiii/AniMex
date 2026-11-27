@@ -20,12 +20,15 @@ function createProvider(name) {
 }
 
 function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(label ? `${label}: Timed out after ${ms}ms` : `Timed out after ${ms}ms`)), ms)
-    ),
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(label ? `${label}: Timed out after ${ms}ms` : `Timed out after ${ms}ms`)),
+      ms
+    );
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 const anilistGraphqlUrl = 'https://graphql.anilist.co';
@@ -48,21 +51,27 @@ async function fetchAnilistMedia(anilistId) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-  const resp = await fetch(anilistGraphqlUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ query, variables: { id: anilistId } }),
-    signal: controller.signal,
-  });
+  try {
+    const resp = await fetch(anilistGraphqlUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query, variables: { id: anilistId } }),
+      signal: controller.signal,
+    });
 
-  clearTimeout(timeoutId);
+    if (!resp.ok) {
+      console.error('AniList API error:', resp.status);
+      return null;
+    }
 
-  if (!resp.ok) {
-    throw new Error(`AniList API error: ${resp.status}`);
+    const json = await resp.json();
+    return json.data?.Media ?? null;
+  } catch (error) {
+    console.error('AniList fetch error:', error.message);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const json = await resp.json();
-  return json.data?.Media;
 }
 
 async function searchOnProvider(provider, titles) {
@@ -89,7 +98,9 @@ async function searchOnProvider(provider, titles) {
 async function tryProviders(anilistId, titles) {
   const media = await fetchAnilistMedia(anilistId);
   if (!media) {
-    throw new Error(`AniList media not found for ID ${anilistId}`);
+    const error = new Error(`AniList media not found for ID ${anilistId}`);
+    error.status = 404;
+    throw error;
   }
 
   const searchTitles = [
@@ -150,6 +161,10 @@ app.get('/meta/anilist/info/:id', async (req, res) => {
 
     const result = await tryProviders(anilistId, titles);
 
+    if (!result?.anime) {
+      return res.status(502).json({ error: 'Provider returned no anime metadata' });
+    }
+
     const episodes = (result.anime.episodes || []).map((ep, i) => ({
       id: ep.id,
       number: ep.number || i + 1,
@@ -181,7 +196,7 @@ app.get('/meta/anilist/info/:id', async (req, res) => {
     });
   } catch (e) {
     console.error('/meta/anilist/info error:', e.message);
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 502).json({ error: e.message || 'Anime metadata lookup failed' });
   }
 });
 
@@ -260,7 +275,7 @@ app.get('/meta/anilist/watch/:episodeId', async (req, res) => {
     });
   } catch (e) {
     console.error('/meta/anilist/watch error:', e.message);
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 502).json({ error: e.message || 'Source lookup failed' });
   }
 });
 

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class AnilistVideoSourceService
 {
-    private const LOOKUP_SECONDS = 25;
+    private const LOOKUP_SECONDS = 20;
 
     private string $consumetBaseUrl;
 
@@ -29,41 +29,52 @@ class AnilistVideoSourceService
     {
         $cacheKey = 'sources:lookup:'.$anilistId.':'.$episodeNumber.':'.md5((string) $animeTitle);
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($anilistId, $episodeNumber, $animeTitle) {
-            $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
+        try {
+            return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($anilistId, $episodeNumber, $animeTitle) {
+                $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
 
-            $debug = [
-                'anilist_id' => $anilistId,
-                'episode' => $episodeNumber,
-                'used_title' => $animeTitle,
-            ];
+                $debug = [
+                    'anilist_id' => $anilistId,
+                    'episode' => $episodeNumber,
+                    'used_title' => $animeTitle,
+                ];
 
-            $result = $this->tryConsumet($anilistId, $episodeNumber, $animeTitle);
-            if (empty($result['error']) && ! empty($result['sources'])) {
-                Log::info('AnilistVideoSource: Found sources via Consumet', $debug);
-
-                return $result;
-            }
-
-            Log::warning('AnilistVideoSource: Consumet failed', array_merge($debug, [
-                'error' => $result['error'] ?? null,
-            ]));
-
-            if ($animeTitle && $this->remainingTimeout(1) > 0) {
-                $result = $this->tryAnipub($animeTitle, $episodeNumber);
+                $result = $this->tryConsumet($anilistId, $episodeNumber, $animeTitle);
                 if (empty($result['error']) && ! empty($result['sources'])) {
-                    Log::info('AnilistVideoSource: Found sources via AniPub', $debug);
+                    $this->safeLog('info', 'AnilistVideoSource: Found sources via Consumet', $debug);
 
                     return $result;
                 }
-            }
+
+                $this->safeLog('warning', 'AnilistVideoSource: Consumet failed', array_merge($debug, [
+                    'error' => $result['error'] ?? null,
+                ]));
+
+                if ($animeTitle && $this->remainingTimeout(1) > 0) {
+                    $result = $this->tryAnipub($animeTitle, $episodeNumber);
+                    if (empty($result['error']) && ! empty($result['sources'])) {
+                        $this->safeLog('info', 'AnilistVideoSource: Found sources via AniPub', $debug);
+
+                        return $result;
+                    }
+                }
+
+                return [
+                    'sources' => [], 'subtitles' => [],
+                    'error' => "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}",
+                    'debug' => $debug,
+                ];
+            });
+        } catch (\Throwable $e) {
+            $this->safeLog('error', 'AnilistVideoSource cache lookup failed', [
+                'anilist_id' => $anilistId, 'episode' => $episodeNumber, 'error' => $e->getMessage(),
+            ]);
 
             return [
                 'sources' => [], 'subtitles' => [],
-                'error' => "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}",
-                'debug' => $debug,
+                'error' => 'Source lookup is temporarily unavailable',
             ];
-        });
+        }
     }
 
     private function remainingTimeout(int $max): int
@@ -119,7 +130,7 @@ class AnilistVideoSourceService
                 'totalEpisodes' => $data['totalEpisodes'] ?? count($episodes),
                 'title' => $data['title'] ?? null,
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['error' => 'Consumet server unreachable: '.$e->getMessage()];
         }
     }
@@ -218,7 +229,7 @@ class AnilistVideoSourceService
             }
 
             return compact('sources', 'subtitles') + ['headers' => $headers];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['sources' => [], 'subtitles' => [], 'error' => 'Consumet: '.$e->getMessage()];
         }
     }
@@ -344,8 +355,17 @@ class AnilistVideoSourceService
             ];
 
             return ['sources' => $sources, 'subtitles' => [], 'headers' => []];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['sources' => [], 'subtitles' => [], 'error' => 'AniPub error: '.$e->getMessage()];
+        }
+    }
+
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::log($level, $message, $context);
+        } catch (\Throwable $e) {
+            return;
         }
     }
 }

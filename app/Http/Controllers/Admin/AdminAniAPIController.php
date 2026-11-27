@@ -16,7 +16,7 @@ class AdminAniAPIController extends Controller
     public function importEpisodeSources(Request $request, Anime $anime, Episode $episode)
     {
         abort_if($episode->anime_id !== $anime->id, 404);
-        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
+        abort_if(! auth()->check() || ! auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -24,12 +24,18 @@ class AdminAniAPIController extends Controller
         /** @var AnilistVideoSourceService $service */
         $service = app(AnilistVideoSourceService::class);
 
-        $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
-
-        if (!empty($result['error'])) {
+        try {
+            $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
+        } catch (\Throwable $e) {
             return redirect()
                 ->route('admin.anime.episodes', $anime)
-                ->with('error', 'Import failed: ' . $result['error']);
+                ->with('error', 'Import failed: source lookup could not be completed.');
+        }
+
+        if (! empty($result['error'])) {
+            return redirect()
+                ->route('admin.anime.episodes', $anime)
+                ->with('error', 'Import failed: '.$result['error']);
         }
 
         $sources = $result['sources'] ?? [];
@@ -49,7 +55,9 @@ class AdminAniAPIController extends Controller
             foreach ($sources as $s) {
                 $quality = (string) ($s['quality'] ?? '720p');
                 $url = (string) ($s['url'] ?? '');
-                if ($url === '') continue;
+                if ($url === '') {
+                    continue;
+                }
 
                 EpisodeSource::create([
                     'episode_id' => $episode->id,
@@ -67,7 +75,9 @@ class AdminAniAPIController extends Controller
 
             foreach ($subtitles as $t) {
                 $filePath = (string) ($t['file_path'] ?? '');
-                if ($filePath === '') continue;
+                if ($filePath === '') {
+                    continue;
+                }
 
                 Subtitle::create([
                     'episode_id' => $episode->id,
@@ -80,6 +90,7 @@ class AdminAniAPIController extends Controller
         });
 
         $count = count($sources);
+
         return redirect()
             ->route('admin.anime.episodes', $anime)
             ->with('success', "Imported {$count} video source(s) successfully.");
@@ -87,7 +98,7 @@ class AdminAniAPIController extends Controller
 
     public function importAllEpisodeSources(Request $request, Anime $anime)
     {
-        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
+        abort_if(! auth()->check() || ! auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -109,10 +120,17 @@ class AdminAniAPIController extends Controller
         $errors = [];
 
         foreach ($episodes as $episode) {
-            $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
+            try {
+                $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
+            } catch (\Throwable $e) {
+                $errors[] = "Ep {$episode->number}: source lookup could not be completed";
 
-            if (!empty($result['error']) || empty($result['sources'])) {
-                $errors[] = "Ep {$episode->number}: " . ($result['error'] ?? 'No sources');
+                continue;
+            }
+
+            if (! empty($result['error']) || empty($result['sources'])) {
+                $errors[] = "Ep {$episode->number}: ".($result['error'] ?? 'No sources');
+
                 continue;
             }
 
@@ -120,7 +138,9 @@ class AdminAniAPIController extends Controller
                 $sort = 0;
                 foreach ($result['sources'] as $s) {
                     $url = (string) ($s['url'] ?? '');
-                    if ($url === '') continue;
+                    if ($url === '') {
+                        continue;
+                    }
 
                     EpisodeSource::create([
                         'episode_id' => $episode->id,
@@ -138,7 +158,9 @@ class AdminAniAPIController extends Controller
 
                 foreach ($result['subtitles'] ?? [] as $t) {
                     $filePath = (string) ($t['file_path'] ?? '');
-                    if ($filePath === '') continue;
+                    if ($filePath === '') {
+                        continue;
+                    }
 
                     Subtitle::create([
                         'episode_id' => $episode->id,
@@ -156,8 +178,8 @@ class AdminAniAPIController extends Controller
         }
 
         $message = "Imported sources for {$imported} episode(s).";
-        if (!empty($errors)) {
-            $message .= ' Errors: ' . implode('; ', array_slice($errors, 0, 5));
+        if (! empty($errors)) {
+            $message .= ' Errors: '.implode('; ', array_slice($errors, 0, 5));
         }
 
         return redirect()
@@ -167,7 +189,7 @@ class AdminAniAPIController extends Controller
 
     public function fetchEpisodeList(Request $request, Anime $anime)
     {
-        abort_if(!auth()->check() || !auth()->user()->isAdmin(), 403);
+        abort_if(! auth()->check() || ! auth()->user()->isAdmin(), 403);
 
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
@@ -177,10 +199,10 @@ class AdminAniAPIController extends Controller
 
         $result = $service->fetchEpisodeList($anilistId, $anime->title);
 
-        if (!empty($result['error'])) {
+        if (! empty($result['error'])) {
             return redirect()
                 ->route('admin.anime.episodes', $anime)
-                ->with('error', 'Failed to fetch episode list: ' . $result['error']);
+                ->with('error', 'Failed to fetch episode list: '.$result['error']);
         }
 
         $episodes = $result['episodes'] ?? [];
@@ -190,7 +212,9 @@ class AdminAniAPIController extends Controller
 
         foreach ($episodes as $ep) {
             $number = (int) ($ep['number'] ?? 0);
-            if ($number <= 0) continue;
+            if ($number <= 0) {
+                continue;
+            }
 
             $existing = $anime->episodes()->where('number', $number)->first();
 
@@ -203,19 +227,19 @@ class AdminAniAPIController extends Controller
 
             if ($existing) {
                 $dirty = false;
-                if (!$existing->title && $data['title']) {
+                if (! $existing->title && $data['title']) {
                     $existing->title = $data['title'];
                     $dirty = true;
                 }
-                if (!$existing->synopsis && $data['synopsis']) {
+                if (! $existing->synopsis && $data['synopsis']) {
                     $existing->synopsis = $data['synopsis'];
                     $dirty = true;
                 }
-                if (!$existing->thumbnail && $data['thumbnail']) {
+                if (! $existing->thumbnail && $data['thumbnail']) {
                     $existing->thumbnail = $data['thumbnail'];
                     $dirty = true;
                 }
-                if (!$existing->aired_at && $data['aired_at']) {
+                if (! $existing->aired_at && $data['aired_at']) {
                     $existing->aired_at = $data['aired_at'];
                     $dirty = true;
                 }
@@ -224,7 +248,7 @@ class AdminAniAPIController extends Controller
                     $updated++;
                 }
             } else {
-                $episode = new Episode();
+                $episode = new Episode;
                 $episode->anime_id = $anime->id;
                 $episode->number = $number;
                 $episode->title = $data['title'];
@@ -238,12 +262,16 @@ class AdminAniAPIController extends Controller
 
         $total = count($episodes);
         $parts = [];
-        if ($created > 0) $parts[] = "{$created} created";
-        if ($updated > 0) $parts[] = "{$updated} updated";
+        if ($created > 0) {
+            $parts[] = "{$created} created";
+        }
+        if ($updated > 0) {
+            $parts[] = "{$updated} updated";
+        }
         $parts[] = "{$total} total from provider ({$result['provider']})";
 
         return redirect()
             ->route('admin.anime.episodes', $anime)
-            ->with('success', 'Episodes synced: ' . implode(', ', $parts) . '.');
+            ->with('success', 'Episodes synced: '.implode(', ', $parts).'.');
     }
 }

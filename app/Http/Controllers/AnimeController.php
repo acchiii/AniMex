@@ -16,11 +16,13 @@ use App\Models\WatchHistory;
 use App\Services\AnilistVideoSourceService;
 use App\Services\JimakuService;
 use App\Services\OpenSubtitlesService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /** Helper function for auth check */
 function user_check(): bool
@@ -157,49 +159,55 @@ class AnimeController extends Controller
             );
         }
 
-        // Fetch English subtitles — always try Jimaku first (replaces mislabeled provider subs)
-        // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
-        $hasCachedEnglish = $episode->subtitles()
-            ->where('language', 'en')
-            ->where('file_path', 'like', '%/subtitles/%')
-            ->exists();
-        $jimakuEnglishFound = $hasCachedEnglish;
-        if (! $hasCachedEnglish && $anime->anilist_id) {
-            $jimaku = app(JimakuService::class);
-            $subs = $jimaku->fetchSubtitles(
-                (int) $anime->anilist_id,
-                $episodeNumber,
-                'en'
-            );
-            if (! empty($subs)) {
+        try {
+            // Fetch English subtitles — always try Jimaku first (replaces mislabeled provider subs)
+            // 1. Try Jimaku (by AniList ID) — more accurate/synchronized
+            $hasCachedEnglish = $episode->subtitles()
+                ->where('language', 'en')
+                ->where('file_path', 'like', '%/subtitles/%')
+                ->exists();
+            $jimakuEnglishFound = $hasCachedEnglish;
+            if (! $hasCachedEnglish && $anime->anilist_id) {
+                $jimaku = app(JimakuService::class);
+                $subs = $jimaku->fetchSubtitles(
+                    (int) $anime->anilist_id,
+                    $episodeNumber,
+                    'en'
+                );
+                if (! empty($subs)) {
+                    $episode->subtitles()->where('language', 'en')->delete();
+                    foreach ($subs as $sub) {
+                        Subtitle::create(['episode_id' => $episode->id] + $sub);
+                    }
+                    if ($subs[0]['language'] === 'en') {
+                        $jimakuEnglishFound = true;
+                    }
+                }
+            }
+
+            // 2. Fall back to OpenSubtitles if Jimaku didn't find English subs
+            if (! $jimakuEnglishFound && ! $hasCachedEnglish) {
                 $episode->subtitles()->where('language', 'en')->delete();
-                foreach ($subs as $sub) {
-                    Subtitle::create(['episode_id' => $episode->id] + $sub);
-                }
-                if ($subs[0]['language'] === 'en') {
-                    $jimakuEnglishFound = true;
-                }
-            }
-        }
-
-        // 2. Fall back to OpenSubtitles if Jimaku didn't find English subs
-        if (! $jimakuEnglishFound && ! $hasCachedEnglish) {
-            $episode->subtitles()->where('language', 'en')->delete();
-            $os = app(OpenSubtitlesService::class);
-            $subs = $os->fetchSubtitles(
-                $anime->title_english ?: $anime->title,
-                $os->guessSeason($episodeNumber),
-                $episodeNumber,
-                'en'
-            );
-            if (! empty($subs)) {
-                foreach ($subs as $sub) {
-                    Subtitle::create(['episode_id' => $episode->id] + $sub);
+                $os = app(OpenSubtitlesService::class);
+                $subs = $os->fetchSubtitles(
+                    $anime->title_english ?: $anime->title,
+                    $os->guessSeason($episodeNumber),
+                    $episodeNumber,
+                    'en'
+                );
+                if (! empty($subs)) {
+                    foreach ($subs as $sub) {
+                        Subtitle::create(['episode_id' => $episode->id] + $sub);
+                    }
                 }
             }
-        }
 
-        $episode->load('subtitles');
+            $episode->load('subtitles');
+        } catch (\Throwable $e) {
+            $this->safeLog('warning', 'Subtitle retrieval failed', [
+                'anime' => $anime->id, 'episode' => $episode->id, 'error' => $e->getMessage(),
+            ]);
+        }
 
         // Ads
         $bannerAd = null;
@@ -216,90 +224,100 @@ class AnimeController extends Controller
 
     private function fetchSourcesOnTheFly($anime, $episode): ?string
     {
-        $lock = Cache::lock("sources:fetch:{$episode->id}", 60);
-        $acquired = false;
+        try {
+            $lock = Cache::lock("sources:fetch:{$episode->id}", 60);
+            $acquired = false;
 
-        $result = $lock->block(25, function () use (&$acquired, $anime, $episode) {
-            $acquired = true;
+            $result = $lock->block(5, function () use (&$acquired, $anime, $episode) {
+                $acquired = true;
 
-            try {
-                if ($episode->sources()->exists()) {
+                try {
+                    if ($episode->sources()->exists()) {
+                        return null;
+                    }
+
+                    $service = app(AnilistVideoSourceService::class);
+                    $title = $anime->title_english ?: $anime->title;
+                    $result = $service->fetchEpisodeSources(
+                        (int) ($anime->anilist_id ?? 0), (int) $episode->number, $title
+                    );
+
+                    if (! empty($result['error']) || empty($result['sources'])) {
+                        $err = $result['error'] ?? 'All providers returned no sources';
+                        $this->safeLog('warning', 'On-the-fly source fetch failed', [
+                            'anime' => $anime->id, 'episode' => $episode->id, 'title' => $title,
+                            'error' => $err,
+                        ]);
+
+                        return $err;
+                    }
+
+                    DB::transaction(function () use ($episode, $result) {
+                        $sort = 0;
+                        foreach ($result['sources'] as $s) {
+                            $url = (string) ($s['url'] ?? '');
+                            if ($url === '' || ! $this->isValidSourceUrl($url)) {
+                                continue;
+                            }
+
+                            EpisodeSource::create([
+                                'episode_id' => $episode->id,
+                                'video_server_id' => null,
+                                'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
+                                'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
+                                'url' => $url,
+                                'headers' => $s['headers'] ?? null,
+                                'type' => (string) ($s['type'] ?? 'hls'),
+                                'language' => (string) ($s['language'] ?? 'sub'),
+                                'is_active' => true,
+                                'sort_order' => $sort++,
+                            ]);
+                        }
+
+                        $allowedLangs = ['en', 'ja'];
+                        foreach ($result['subtitles'] ?? [] as $t) {
+                            $filePath = (string) ($t['file_path'] ?? '');
+                            if ($filePath === '') {
+                                continue;
+                            }
+
+                            $lang = (string) ($t['language'] ?? 'en');
+                            if (! in_array($lang, $allowedLangs, true)) {
+                                continue;
+                            }
+
+                            Subtitle::create([
+                                'episode_id' => $episode->id,
+                                'language' => $lang,
+                                'label' => (string) ($t['label'] ?? strtoupper($lang)),
+                                'file_path' => $filePath,
+                                'is_default' => $lang === 'en',
+                            ]);
+                        }
+                    });
+
                     return null;
-                }
-
-                $service = app(AnilistVideoSourceService::class);
-                $title = $anime->title_english ?: $anime->title;
-                $result = $service->fetchEpisodeSources(
-                    (int) ($anime->anilist_id ?? 0), (int) $episode->number, $title
-                );
-
-                if (! empty($result['error']) || empty($result['sources'])) {
-                    $err = $result['error'] ?? 'All providers returned no sources';
-                    logger()->warning('On-the-fly source fetch failed', [
-                        'anime' => $anime->id, 'episode' => $episode->id, 'title' => $title,
-                        'error' => $err,
+                } catch (\Throwable $e) {
+                    $this->safeLog('error', 'On-the-fly source fetch failed', [
+                        'anime' => $anime->id, 'episode' => $episode->id, 'error' => $e->getMessage(),
                     ]);
 
-                    return $err;
+                    return 'Could not fetch sources right now. Please try again.';
                 }
+            });
 
-                DB::transaction(function () use ($episode, $result) {
-                    $sort = 0;
-                    foreach ($result['sources'] as $s) {
-                        $url = (string) ($s['url'] ?? '');
-                        if ($url === '' || ! $this->isValidSourceUrl($url)) {
-                            continue;
-                        }
+            return $acquired
+                ? $result
+                : 'Sources are being fetched for this episode; please refresh in a few seconds.';
+        } catch (LockTimeoutException $e) {
+            return 'Sources are being fetched for this episode; please refresh in a few seconds.';
+        } catch (\Throwable $e) {
+            $this->safeLog('error', 'Source fetch lock failed', [
+                'anime' => $anime->id, 'episode' => $episode->id, 'error' => $e->getMessage(),
+            ]);
 
-                        EpisodeSource::create([
-                            'episode_id' => $episode->id,
-                            'video_server_id' => null,
-                            'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
-                            'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
-                            'url' => $url,
-                            'headers' => $s['headers'] ?? null,
-                            'type' => (string) ($s['type'] ?? 'hls'),
-                            'language' => (string) ($s['language'] ?? 'sub'),
-                            'is_active' => true,
-                            'sort_order' => $sort++,
-                        ]);
-                    }
-
-                    $allowedLangs = ['en', 'ja'];
-                    foreach ($result['subtitles'] ?? [] as $t) {
-                        $filePath = (string) ($t['file_path'] ?? '');
-                        if ($filePath === '') {
-                            continue;
-                        }
-
-                        $lang = (string) ($t['language'] ?? 'en');
-                        if (! in_array($lang, $allowedLangs, true)) {
-                            continue;
-                        }
-
-                        Subtitle::create([
-                            'episode_id' => $episode->id,
-                            'language' => $lang,
-                            'label' => (string) ($t['label'] ?? strtoupper($lang)),
-                            'file_path' => $filePath,
-                            'is_default' => $lang === 'en',
-                        ]);
-                    }
-                });
-
-                return null;
-            } catch (\Exception $e) {
-                logger()->error('On-the-fly source fetch failed: '.$e->getMessage(), [
-                    'anime' => $anime->id, 'episode' => $episode->id,
-                ]);
-
-                return $e->getMessage();
-            }
-        });
-
-        return $acquired
-            ? $result
-            : 'Sources are being fetched for this episode; please refresh in a few seconds.';
+            return 'Could not check sources right now. Please try again.';
+        }
     }
 
     // ─── API-like Actions (for AJAX) ────────────────────────────────────────────
@@ -828,5 +846,14 @@ class AnimeController extends Controller
             'Content-Length' => strlen($content),
             'Cache-Control' => 'public, max-age=86400',
         ]);
+    }
+
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::log($level, $message, $context);
+        } catch (\Throwable $e) {
+            return;
+        }
     }
 }

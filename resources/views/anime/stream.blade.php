@@ -490,6 +490,8 @@
         }
 
         function selectSubtitle(lang) {
+            if (!player) return;
+
             userSubChoice = true;
             activeSubLang = lang;
 
@@ -586,6 +588,8 @@
         }
 
         function setSubSize(size) {
+            if (!player) return;
+
             ['sm', 'md', 'lg'].forEach(function (s) {
                 player.classList.remove('subtitle-' + s);
             });
@@ -598,6 +602,8 @@
         }
 
         function setSubBg(bg) {
+            if (!player) return;
+
             ['off', 'semi', 'solid'].forEach(function (b) {
                 player.classList.remove('subtitle-bg-' + b);
             });
