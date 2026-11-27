@@ -116,25 +116,32 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
   function duration and DB connections. For heavy traffic, serve video from
   the provider/CDN directly where possible or move Laravel to a container.
 
-8) Deploy the Anivexa source provider
+8) Deploy the Anivexa source provider on Vercel
 - Anivexa is the primary episode/source provider. Consumet, AniPub and AniList
   remain fallbacks.
-- Do not deploy Anivexa on Vercel. Shared datacenter IPs are blocked by many
-  anime sites. Use Railway, Render or a small VPS instead.
-- Build from: https://github.com/walterwhite-69/Anivexa-API
-- Start command: node server.js
-- Build/install command: npm install
-- Set PORT from the host. Keep CACHE_ENABLED=false unless Upstash Redis is
-  configured.
-- The raw self-hosted API uses routes such as /episodes/:anilistId and
-  /watch/:provider/:anilistId/:audio/:provider-:episode. If a gateway adds an
-  /anime/anivexa prefix, include that prefix in ANIVEXA_BASE_URL or set the
-  Anivexa BASE_PATH environment variable.
-- Verify the deployment root returns the service/providers JSON, then set in
-  Vercel: ANIVEXA_BASE_URL=https://<your-anivexa-host>
+- The source lives in the repository at: anivexa-server/
+- Create a separate Vercel project from this repository.
+- Root Directory: anivexa-server
+- Framework: Other
+- Build Command: leave empty (default npm install is enough)
+- Output Directory: leave empty
+- anivexa-server/vercel.json maps every public path to api/index.js and sets a
+  60-second function timeout.
+- Vercel shared IPs are blocked by some anime sites, so provider results may be
+  incomplete. If sources are consistently empty, move this same folder to a
+  non-Vercel Node host.
+- Environment variables for the Anivexa Vercel project:
+  CACHE_ENABLED=false
+  DEFAULT_REDIS_TTL=900
+  Optional: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+- PORT is ignored on Vercel serverless functions.
+- Verify the deployment with:
+  curl "https://<anivexa-project>.vercel.app/episodes/animegg/kaa/11061?map=false"
+  curl "https://<anivexa-project>.vercel.app/watch/kaa/11061/sub/kaa-1"
+- In the Laravel Vercel project set:
+  ANIVEXA_BASE_URL=https://<anivexa-project>.vercel.app
   ANIVEXA_PROVIDERS=animegg,kaa
-- Local .env should use ANIVEXA_BASE_URL=http://127.0.0.1:4000 and the local
-  Anivexa server can be started with: cd Anivexa-API && npm install && npm start
-- Verify one title with:
-  curl "https://<your-anivexa-host>/episodes/animegg/kaa/11061?map=false"
-  curl "https://<your-anivexa-host>/watch/kaa/11061/sub/kaa-1"
+- For local testing, start Anivexa with:
+  cd anivexa-server && npm install && npm start
+  Then set the Laravel .env ANIVEXA_BASE_URL to http://127.0.0.1:4000 if Node
+  runs on Windows, or to the WSL IP shown by `hostname -I` if Node runs in WSL.
