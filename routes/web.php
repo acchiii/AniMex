@@ -10,21 +10,53 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/health/db', function () {
+    $redact = fn (string $message): string => preg_replace(
+        '/(password|passwd|pwd|secret|token)=[^&\s]+/i',
+        '$1=[redacted]',
+        $message
+    );
+
+    $dbError = null;
+    $cacheError = null;
+
     try {
         DB::select('select 1');
-        $key = 'health:check:'.uniqid();
-        Cache::put($key, 'ok', 10);
-        $cacheOk = Cache::get($key) === 'ok';
-
-        return response()->json(
-            ['database' => 'ok', 'cache' => $cacheOk ? 'ok' : 'failed'],
-            $cacheOk ? 200 : 500
-        );
     } catch (Throwable $e) {
         report($e);
-
-        return response()->json(['database' => 'failed', 'cache' => 'failed'], 500);
+        $dbError = [
+            'type' => class_basename($e),
+            'message' => $redact($e->getMessage()),
+        ];
     }
+
+    if ($dbError === null) {
+        try {
+            $key = 'health:check:'.uniqid();
+            Cache::put($key, 'ok', 10);
+            if (Cache::get($key) !== 'ok') {
+                throw new RuntimeException('Cache write/read verification failed');
+            }
+        } catch (Throwable $e) {
+            report($e);
+            $cacheError = [
+                'type' => class_basename($e),
+                'message' => $redact($e->getMessage()),
+            ];
+        }
+    } else {
+        $cacheError = [
+            'type' => 'Skipped',
+            'message' => 'Cache check skipped because the database connection failed.',
+        ];
+    }
+
+    return response()->json([
+        'connection' => config('database.default'),
+        'database' => $dbError === null ? 'ok' : 'failed',
+        'database_error' => $dbError,
+        'cache' => $cacheError === null ? 'ok' : 'failed',
+        'cache_error' => $cacheError,
+    ], ($dbError === null && $cacheError === null) ? 200 : 500);
 })->name('health.db');
 
 // Anime Routes

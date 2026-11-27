@@ -2,6 +2,18 @@
 
 <?php $__env->startSection('content'); ?>
 
+<?php if(! empty($homeErrors)): ?>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div class="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-200">
+        <p class="font-semibold">Homepage data could not be loaded from Neon.</p>
+        <?php $__currentLoopData = $homeErrors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $context => $message): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <p class="mt-1 break-words"><span class="font-mono"><?php echo e($context); ?></span>: <?php echo e($message); ?></p>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        <p class="mt-2"><a href="<?php echo e(route('health.db')); ?>" class="underline">Open full diagnostics</a></p>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php $__env->startPush('styles'); ?>
 <style>
   :root { --h-start: #f9fafb; --h-mid: rgba(249,250,251,0.7); --h-top: rgba(249,250,251,0.25); }

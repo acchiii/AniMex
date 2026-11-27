@@ -2,6 +2,18 @@
 
 @section('content')
 
+@if(! empty($homeErrors))
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div class="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-200">
+        <p class="font-semibold">Homepage data could not be loaded from Neon.</p>
+        @foreach($homeErrors as $context => $message)
+            <p class="mt-1 break-words"><span class="font-mono">{{ $context }}</span>: {{ $message }}</p>
+        @endforeach
+        <p class="mt-2"><a href="{{ route('health.db') }}" class="underline">Open full diagnostics</a></p>
+    </div>
+</div>
+@endif
+
 @push('styles')
 <style>
   :root { --h-start: #f9fafb; --h-mid: rgba(249,250,251,0.7); --h-top: rgba(249,250,251,0.25); }

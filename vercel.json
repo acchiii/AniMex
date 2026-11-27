@@ -26,6 +26,8 @@
     "APP_ROUTES_CACHE": "/tmp/routes.php",
     "APP_SERVICES_CACHE": "/tmp/services.php",
     "VIEW_COMPILED_PATH": "/tmp",
+    "DB_CONNECTION": "pgsql",
+    "DB_SSLMODE": "require",
     "CACHE_STORE": "database",
     "CACHE_DRIVER": "database",
     "SESSION_DRIVER": "cookie",

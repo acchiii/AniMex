@@ -12,9 +12,12 @@ use Throwable;
 
 class HomeController extends Controller
 {
+    private array $homeErrors = [];
+
     public function index()
     {
         $user = auth()->user();
+        $this->homeErrors = [];
 
         $heroAnime = $this->rememberSafely('hero_anime', 1800, fn () => Anime::featured()->with(['genres'])->limit(5)->get()
         );
@@ -91,6 +94,8 @@ class HomeController extends Controller
         $genres = $genres ?? collect();
         $continueWatching = $continueWatching ?? collect();
 
+        $homeErrors = $this->homeErrors;
+
         $heroJson = $heroAnime->map(function ($a) {
             return [
                 'title' => $a->title_english ?? $a->title,
@@ -102,7 +107,8 @@ class HomeController extends Controller
 
         return view('home', compact(
             'heroAnime', 'trending', 'continueWatching', 'topRated',
-            'newEpisodes', 'genreSections', 'upcoming', 'genres', 'ads', 'heroJson'
+            'newEpisodes', 'genreSections', 'upcoming', 'genres', 'ads', 'heroJson',
+            'homeErrors'
         ));
     }
 
@@ -121,7 +127,22 @@ class HomeController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            if ($context !== null) {
+                $this->homeErrors[$context] = $this->formatError($e);
+            }
+
             return $fallback;
         }
+    }
+
+    private function formatError(Throwable $e): string
+    {
+        $message = preg_replace(
+            '/(password|passwd|pwd|secret|token)=[^&\s]+/i',
+            '$1=[redacted]',
+            $e->getMessage()
+        );
+
+        return class_basename($e).': '.$message;
     }
 }

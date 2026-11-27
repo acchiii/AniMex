@@ -17,10 +17,10 @@ Premium Anime Streaming Platform built with Laravel 11.
 
 ## Requirements
 
-- PHP >= 8.2
+- PHP >= 8.2 with pdo_pgsql
 - Composer
 - Node.js & NPM
-- SQLite / MySQL
+- Neon PostgreSQL (mandatory)
 
 ## Installation
 
@@ -41,8 +41,8 @@ cp .env.example .env
 # Generate application key
 php artisan key:generate
 
-# Create SQLite database
-touch database/database.sqlite
+# Set DB_HOST, DB_PASSWORD, etc. in .env to your Neon credentials
+# (DB_CONNECTION is fixed to pgsql in config/database.php)
 
 # Run migrations and seed sample data
 php artisan migrate:fresh --seed

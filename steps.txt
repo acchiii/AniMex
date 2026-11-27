@@ -98,6 +98,9 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
 
 6) Verify after deployment
 - GET /up returns OK.
+- GET /health/db returns 200 with database: ok and cache: ok. If it returns 500,
+  the JSON includes the exact database/cache error messages, and the homepage
+  shows the same errors in a red banner.
 - Homepage loads with CSS and JS (check Network tab for 200 responses from
   /build/assets/...).
 - Open a watch page and confirm no "Could not find video sources" warning.
