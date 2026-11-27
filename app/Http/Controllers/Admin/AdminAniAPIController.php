@@ -216,59 +216,66 @@ class AdminAniAPIController extends Controller
 
         $episodes = $result['episodes'] ?? [];
 
-        $created = 0;
-        $updated = 0;
+        $existing = Episode::withTrashed()
+            ->where('anime_id', $anime->id)
+            ->get()
+            ->keyBy('number');
+        $queued = [];
+        $inserts = [];
+        $updates = [];
+        $timestamp = now()->format('Y-m-d H:i:s');
 
         foreach ($episodes as $ep) {
             $number = (int) ($ep['number'] ?? 0);
-            if ($number <= 0) {
+            if ($number <= 0 || isset($queued[$number])) {
                 continue;
             }
-
-            $existing = $anime->episodes()->where('number', $number)->first();
+            $queued[$number] = true;
 
             $data = [
                 'title' => ($ep['title'] ?? null) ?: "Episode {$number}",
                 'synopsis' => $ep['description'] ?? null,
                 'thumbnail' => $ep['image'] ?? null,
-                'aired_at' => isset($ep['releaseDate']) && $ep['releaseDate'] ? $ep['releaseDate'] : null,
+                'aired_at' => ! empty($ep['releaseDate']) ? substr((string) $ep['releaseDate'], 0, 10) : null,
             ];
 
-            if ($existing) {
-                $dirty = false;
-                if (! $existing->title && $data['title']) {
-                    $existing->title = $data['title'];
-                    $dirty = true;
+            $current = $existing->get($number);
+            if (! $current) {
+                $inserts[] = array_merge([
+                    'anime_id' => $anime->id,
+                    'number' => $number,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ], $data);
+
+                continue;
+            }
+
+            if ($current->trashed()) {
+                continue;
+            }
+
+            $changes = [];
+            foreach (['title', 'synopsis', 'thumbnail', 'aired_at'] as $field) {
+                if (! $current->{$field} && $data[$field]) {
+                    $changes[$field] = $data[$field];
                 }
-                if (! $existing->synopsis && $data['synopsis']) {
-                    $existing->synopsis = $data['synopsis'];
-                    $dirty = true;
-                }
-                if (! $existing->thumbnail && $data['thumbnail']) {
-                    $existing->thumbnail = $data['thumbnail'];
-                    $dirty = true;
-                }
-                if (! $existing->aired_at && $data['aired_at']) {
-                    $existing->aired_at = $data['aired_at'];
-                    $dirty = true;
-                }
-                if ($dirty) {
-                    $existing->save();
-                    $updated++;
-                }
-            } else {
-                $episode = new Episode;
-                $episode->anime_id = $anime->id;
-                $episode->number = $number;
-                $episode->title = $data['title'];
-                $episode->synopsis = $data['synopsis'];
-                $episode->thumbnail = $data['thumbnail'];
-                $episode->aired_at = $data['aired_at'];
-                $episode->save();
-                $created++;
+            }
+            if (! empty($changes)) {
+                $changes['updated_at'] = $timestamp;
+                $updates[$current->id] = $changes;
             }
         }
 
+        if (! empty($inserts)) {
+            Episode::insertOrIgnore($inserts);
+        }
+        foreach ($updates as $id => $changes) {
+            Episode::where('id', $id)->update($changes);
+        }
+
+        $created = count($inserts);
+        $updated = count($updates);
         $total = count($episodes);
         $provider = (string) ($result['provider'] ?? 'unknown');
         $sourceLabel = strtolower($provider) === 'anilist'

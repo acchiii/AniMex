@@ -24,6 +24,14 @@ return [
         'graphql_url' => env('ANILIST_GRAPHQL_URL', 'https://graphql.anilist.co'),
     ],
 
+    'anivexa' => [
+        'base_url' => env('ANIVEXA_BASE_URL', ''),
+        'providers' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('ANIVEXA_PROVIDERS', 'animegg,kaa'))
+        ))),
+    ],
+
     'opensubtitles' => [
         'api_key' => env('OPENSUBTITLES_API_KEY', ''),
     ],

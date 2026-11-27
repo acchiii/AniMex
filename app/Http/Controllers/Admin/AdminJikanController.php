@@ -10,6 +10,7 @@ use App\Models\Studio;
 use App\Services\AniListCatalogService;
 use App\Services\AnilistVideoSourceService;
 use App\Services\JikanService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -151,13 +152,8 @@ GQL;
             $parsed['slug'] = $parsed['slug'].'-'.$malId;
         }
 
-        $studioId = null;
-        if (! empty($parsed['studios'])) {
-            $studio = Studio::firstOrCreate(['name' => $parsed['studios'][0]['name']], [
-                'slug' => Str::slug($parsed['studios'][0]['name']),
-            ]);
-            $studioId = $studio->id;
-        }
+        $studio = $this->firstOrCreateBySlug(Studio::class, (string) ($parsed['studios'][0]['name'] ?? ''));
+        $studioId = $studio?->id;
 
         $animeData = [
             'mal_id' => $parsed['mal_id'],
@@ -203,10 +199,10 @@ GQL;
 
         $genreIds = [];
         foreach ($parsed['genres'] as $genreData) {
-            $genre = Genre::firstOrCreate(['name' => $genreData['name']], [
-                'slug' => Str::slug($genreData['name']),
-            ]);
-            $genreIds[] = $genre->id;
+            $genre = $this->firstOrCreateBySlug(Genre::class, (string) ($genreData['name'] ?? ''));
+            if ($genre) {
+                $genreIds[] = $genre->id;
+            }
         }
         $anime->genres()->sync($genreIds);
 
@@ -221,27 +217,19 @@ GQL;
 
                 if (empty($result['error'])) {
                     $episodesData = $result['episodes'] ?? [];
-                    $created = 0;
+                    $rows = [];
 
                     foreach ($episodesData as $ep) {
-                        $number = (int) ($ep['number'] ?? 0);
-                        if ($number <= 0) {
-                            continue;
-                        }
-                        if ($anime->episodes()->where('number', $number)->exists()) {
-                            continue;
-                        }
-
-                        Episode::create([
-                            'anime_id' => $anime->id,
-                            'number' => $number,
+                        $rows[] = [
+                            'number' => (int) ($ep['number'] ?? 0),
                             'title' => $ep['title'] ?? null,
                             'synopsis' => $ep['description'] ?? null,
                             'thumbnail' => $ep['image'] ?? null,
-                            'aired_at' => isset($ep['releaseDate']) && $ep['releaseDate'] ? $ep['releaseDate'] : null,
-                        ]);
-                        $created++;
+                            'aired_at' => ! empty($ep['releaseDate']) ? substr((string) $ep['releaseDate'], 0, 10) : null,
+                        ];
                     }
+
+                    $created = $this->insertMissingEpisodes($anime, $rows);
 
                     Cache::forget('hero_anime');
                     Cache::forget('hero_anime_fallback');
@@ -280,22 +268,71 @@ GQL;
             return 0;
         }
 
-        $existing = $anime->episodes()->pluck('number')->all();
-        $created = 0;
-
+        $rows = [];
         for ($number = 1; $number <= min(1000, $count); $number++) {
-            if (in_array($number, $existing, true)) {
-                continue;
-            }
-            Episode::create([
-                'anime_id' => $anime->id,
+            $rows[] = [
                 'number' => $number,
                 'title' => "Episode {$number}",
-            ]);
-            $existing[] = $number;
-            $created++;
+            ];
         }
 
-        return $created;
+        return $this->insertMissingEpisodes($anime, $rows);
+    }
+
+    private function insertMissingEpisodes(Anime $anime, array $episodes): int
+    {
+        if (empty($episodes)) {
+            return 0;
+        }
+
+        $existing = Episode::withTrashed()
+            ->where('anime_id', $anime->id)
+            ->pluck('number')
+            ->all();
+        $existing = array_map('intval', $existing);
+        $timestamp = now()->format('Y-m-d H:i:s');
+        $rows = [];
+
+        foreach ($episodes as $episode) {
+            $number = (int) ($episode['number'] ?? 0);
+            if ($number <= 0 || in_array($number, $existing, true)) {
+                continue;
+            }
+
+            $rows[] = [
+                'anime_id' => $anime->id,
+                'number' => $number,
+                'title' => $episode['title'] ?? null,
+                'synopsis' => $episode['synopsis'] ?? null,
+                'thumbnail' => $episode['thumbnail'] ?? null,
+                'aired_at' => $episode['aired_at'] ?? null,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+            $existing[] = $number;
+        }
+
+        if (empty($rows)) {
+            return 0;
+        }
+
+        Episode::insertOrIgnore($rows);
+
+        return count($rows);
+    }
+
+    private function firstOrCreateBySlug(string $modelClass, string $name): ?Model
+    {
+        $name = trim($name);
+        $slug = Str::slug($name);
+        if ($slug === '') {
+            return null;
+        }
+
+        try {
+            return $modelClass::firstOrCreate(['slug' => $slug], ['name' => $name]);
+        } catch (UniqueConstraintViolationException) {
+            return $modelClass::where('slug', $slug)->first();
+        }
     }
 }

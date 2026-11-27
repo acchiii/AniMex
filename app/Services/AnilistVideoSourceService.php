@@ -11,7 +11,7 @@ use Throwable;
 
 class AnilistVideoSourceService
 {
-    private const LOOKUP_SECONDS = 20;
+    private const LOOKUP_SECONDS = 40;
 
     private const DISCOVERY_TIMEOUT = 8;
 
@@ -27,10 +27,13 @@ class AnilistVideoSourceService
 
     private ?string $lastError = null;
 
+    private AnivexaVideoSourceService $anivexa;
+
     public function __construct()
     {
         $this->consumetBaseUrl = rtrim((string) config('services.consumet.base_url', 'https://animex-consumet.vercel.app'), '/');
         $this->anipubBaseUrl = rtrim((string) config('services.anipub.base_url', 'https://anipub.xyz'), '/');
+        $this->anivexa = app(AnivexaVideoSourceService::class);
     }
 
     public function fetchEpisodeSources(int $anilistId, int $episodeNumber, ?string $animeTitle = null): array
@@ -55,8 +58,12 @@ class AnilistVideoSourceService
         $result = $this->lookupSources($anilistId, $episodeNumber, $animeTitle);
         $result['debug'] = $debug;
 
+        $seconds = str_starts_with((string) ($result['provider'] ?? ''), 'Anivexa')
+            ? 60
+            : (empty($result['sources']) ? 60 : 600);
+
         try {
-            Cache::put($cacheKey, $result, now()->addSeconds(empty($result['sources']) ? 60 : 600));
+            Cache::put($cacheKey, $result, now()->addSeconds($seconds));
         } catch (Throwable $e) {
             $this->safeLog('warning', 'AnilistVideoSource cache write failed', ['error' => $e->getMessage()]);
         }
@@ -67,6 +74,36 @@ class AnilistVideoSourceService
     public function fetchEpisodeSourcesBatch(int $anilistId, array $episodeNumbers, ?string $animeTitle = null): array
     {
         $this->deadline = microtime(true) + 45;
+
+        $numbers = array_values(array_unique(array_filter(array_map('intval', $episodeNumbers))));
+        $results = [];
+
+        if ($this->anivexa->isEnabled()) {
+            try {
+                $anivexaResults = $this->anivexa->fetchSourcesBatch($anilistId, $numbers);
+                foreach ($anivexaResults as $number => $result) {
+                    if (empty($result['sources'])) {
+                        continue;
+                    }
+
+                    $results[(int) $number] = $result;
+
+                    try {
+                        $key = 'sources:lookup:'.$anilistId.':'.(int) $number.':'.md5((string) $animeTitle);
+                        Cache::put($key, $result, now()->addSeconds(60));
+                    } catch (Throwable $e) {
+                        $this->safeLog('warning', 'AnilistVideoSource batch cache failed', ['error' => $e->getMessage()]);
+                    }
+                }
+            } catch (Throwable $e) {
+                $this->safeLog('warning', 'AnilistVideoSource Anivexa batch failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        $pending = array_values(array_filter($numbers, fn ($number) => ! isset($results[$number])));
+        if (empty($pending)) {
+            return $results;
+        }
 
         $discovery = $this->discover($anilistId, $animeTitle, true);
         $info = $discovery['info'];
@@ -80,10 +117,7 @@ class AnilistVideoSourceService
             }
         }
 
-        $numbers = array_values(array_unique(array_map('intval', $episodeNumbers)));
-        $results = [];
-
-        foreach (array_chunk($numbers, 8) as $chunk) {
+        foreach (array_chunk($pending, 8) as $chunk) {
             $requests = [];
             foreach ($chunk as $number) {
                 $watch = $this->buildWatchUrl($info, $number);
@@ -151,17 +185,33 @@ class AnilistVideoSourceService
             $episodes = Arr::get($info, 'episodes', []);
 
             if (empty($episodes)) {
+                $anivexaError = null;
+                if ($this->anivexa->isEnabled()) {
+                    try {
+                        $anivexaList = $this->anivexa->fetchEpisodeList($anilistId);
+                        if (! empty($anivexaList['episodes'])) {
+                            return $anivexaList;
+                        }
+                        $anivexaError = $anivexaList['error'] ?? null;
+                    } catch (Throwable $e) {
+                        $anivexaError = $e->getMessage();
+                    }
+                }
+
                 $fallback = $this->fetchAniListEpisodes($anilistId, $animeTitle);
                 if (! empty($fallback['episodes'])) {
                     return $fallback;
                 }
 
-                $error = $this->lastError ?: 'Consumet server unreachable';
+                $errors = [$this->lastError ?: 'Consumet server unreachable'];
+                if (! empty($anivexaError)) {
+                    $errors[] = 'Anivexa: '.$anivexaError;
+                }
                 if (! empty($fallback['error'])) {
-                    $error .= ' | AniList: '.$fallback['error'];
+                    $errors[] = 'AniList: '.$fallback['error'];
                 }
 
-                return ['error' => $error];
+                return ['error' => implode(' | ', $errors)];
             }
 
             return [
@@ -261,6 +311,23 @@ class AnilistVideoSourceService
     {
         $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
 
+        $anivexaError = null;
+        if ($this->anivexa->isEnabled()) {
+            try {
+                $anivexa = $this->anivexa->fetchSources($anilistId, $episodeNumber);
+                if (! empty($anivexa['sources'])) {
+                    $this->safeLog('info', 'AnilistVideoSource: Found sources via Anivexa', [
+                        'anilist_id' => $anilistId, 'episode' => $episodeNumber,
+                    ]);
+
+                    return $anivexa;
+                }
+                $anivexaError = $anivexa['error'] ?? null;
+            } catch (Throwable $e) {
+                $anivexaError = $e->getMessage();
+            }
+        }
+
         $discovery = $this->discover($anilistId, $animeTitle, true);
         $info = $discovery['info'];
         $anipubId = (int) $discovery['anipub_id'];
@@ -326,10 +393,15 @@ class AnilistVideoSourceService
             }
         }
 
+        $error = "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}";
+        if (! empty($anivexaError)) {
+            $error .= ' | Anivexa: '.$anivexaError;
+        }
+
         return [
             'sources' => [],
             'subtitles' => [],
-            'error' => "No sources found for AniList ID {$anilistId}, episode {$episodeNumber}",
+            'error' => $error,
         ];
     }
 

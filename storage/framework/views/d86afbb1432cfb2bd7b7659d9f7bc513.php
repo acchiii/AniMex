@@ -67,7 +67,10 @@
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200"><?php echo e($item->type); ?></td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200"><?php echo e($item->status); ?></td>
-                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200"><?php echo e($item->episodes_count); ?></td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div><?php echo e($item->episodes_count ?? 0); ?></div>
+                            <div class="text-xs text-gray-500"><?php echo e($item->episode_rows_count ?? 0); ?> loaded</div>
+                        </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200"><?php echo e($item->year); ?></td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200"><?php echo e(optional($item->created_at)->format('Y-m-d')); ?></td>
                         <td class="px-4 py-3">
