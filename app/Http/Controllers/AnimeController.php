@@ -633,6 +633,13 @@ class AnimeController extends Controller
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
+
+        if (str_starts_with($path, '//')) {
+            $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?: 'https';
+
+            return $scheme.':'.$path;
+        }
+
         $query = '';
         if (($pos = strpos($path, '?')) !== false) {
             $query = substr($path, $pos);
@@ -741,6 +748,12 @@ class AnimeController extends Controller
         $resolveRelative = function (string $uri) use ($pathDir, $baseUrl): string {
             if (str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
                 return $uri;
+            }
+
+            if (str_starts_with($uri, '//')) {
+                $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?: 'https';
+
+                return $scheme.':'.$uri;
             }
 
             if (str_starts_with($uri, '/')) {

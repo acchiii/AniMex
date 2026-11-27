@@ -307,6 +307,7 @@
 
         let hls = null;
         let hlsUsingProxy = false;
+        let currentSourceIndex = -1;
         const player = document.getElementById('video-player');
         const embedPlayer = document.getElementById('embed-player');
         const embedOpenLink = document.getElementById('embed-open-link');
@@ -329,6 +330,7 @@
             const src = sources[index];
             if (!src) return;
 
+            currentSourceIndex = index;
             if (hls) { hls.destroy(); hls = null; }
             hlsUsingProxy = false;
 
@@ -370,7 +372,31 @@
                     abrEwmaSlowVoD: 12.0,
                     lowLatencyMode: false,
                     capLevelToPlayerSize: true,
-                    backbufferLength: 60,
+                    backBufferLength: 60,
+                    manifestLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 15000,
+                            maxLoadTimeMs: 60000,
+                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+                            errorRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 2000 },
+                        },
+                    },
+                    playlistLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 15000,
+                            maxLoadTimeMs: 60000,
+                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+                            errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
+                        },
+                    },
+                    fragLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 20000,
+                            maxLoadTimeMs: 120000,
+                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
+                            errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
+                        },
+                    },
                 });
                 hlsUsingProxy = needsProxy;
                 hls.loadSource(needsProxy ? proxyUrl : src.url);
@@ -383,17 +409,28 @@
                 });
                 hls.on(Hls.Events.ERROR, function (event, data) {
                     console.warn('HLS error:', data.type, data.details, data.fatal);
-                    if (data.fatal) {
-                        if (data.details === 'manifestLoadError' || data.details === 'levelLoadError') {
-                            if (!hlsUsingProxy) {
-                                hlsUsingProxy = true;
-                                hls.loadSource(proxyUrl);
-                            } else {
-                                playOverlay.classList.remove('hidden');
-                            }
-                        } else if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
-                            hls.startLoad();
+                    if (!data.fatal) return;
+
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        if (['manifestLoadError', 'levelLoadError'].includes(data.details) && !hlsUsingProxy) {
+                            hlsUsingProxy = true;
+                            hls.loadSource(proxyUrl);
+                            return;
                         }
+
+                        const nextIndex = currentSourceIndex + 1;
+                        if (nextIndex < sources.length) {
+                            console.warn('HLS source failed, trying next source:', nextIndex);
+                            setTimeout(function () { changeSource(nextIndex); }, 50);
+                            return;
+                        }
+
+                        playOverlay.classList.remove('hidden');
+                        return;
+                    }
+
+                    if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
+                        hls.startLoad();
                     }
                 });
                 return;

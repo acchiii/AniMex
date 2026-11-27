@@ -21242,3 +21242,14 @@ DETAIL:  Key (slug)=(madhouse) already exists. at C:/xampp/htdocs/AniMex/vendor/
 [2026-11-27 11:02:34] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
 [2026-11-27 11:03:16] local.WARNING: Anivexa request failed {"url":"http://localhost:4000/watch/animegg/130298/sub/animegg-2","error":"cURL error 28: Operation timed out after 12013 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://localhost:4000/watch/animegg/130298/sub/animegg-2"} 
 [2026-11-27 11:03:20] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":130298,"episode":2} 
+[2026-11-27 11:35:21] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
+[2026-11-27 11:36:55] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
+[2026-11-27 11:36:58] local.WARNING: OpenSubtitles download failed {"file_id":6796888,"status":406} 
+[2026-11-27 11:37:18] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":130298,"episode":3} 
+[2026-11-27 11:37:31] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
+[2026-11-27 11:37:34] local.WARNING: OpenSubtitles download failed {"file_id":6796888,"status":406} 
+[2026-11-27 11:40:27] local.WARNING: Jimaku search failed {"anilist_id":130298,"status":400} 
+[2026-11-27 11:40:29] local.WARNING: OpenSubtitles download failed {"file_id":6796888,"status":406} 
+[2026-11-27 11:44:43] local.WARNING: Jimaku search failed {"anilist_id":135806,"status":400} 
+[2026-11-27 12:26:03] local.WARNING: Anivexa request failed {"url":"https://ani-mex.vercel.app/episodes/anikoto/kaa/animegg/174576?map=false","error":"cURL error 28: Operation timed out after 30004 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for https://ani-mex.vercel.app/episodes/anikoto/kaa/animegg/174576?map=false"} 
+[2026-11-27 12:29:39] local.WARNING: Anivexa request failed {"url":"https://ani-mex.vercel.app/episodes/anikoto/kaa/animegg/195600?map=false","error":"cURL error 28: Operation timed out after 30015 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for https://ani-mex.vercel.app/episodes/anikoto/kaa/animegg/195600?map=false"} 

@@ -28,7 +28,7 @@ return [
         'base_url' => env('ANIVEXA_BASE_URL', ''),
         'providers' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('ANIVEXA_PROVIDERS', 'animegg,kaa'))
+            explode(',', (string) env('ANIVEXA_PROVIDERS', 'anikoto,kaa,animegg'))
         ))),
     ],
 

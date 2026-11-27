@@ -140,7 +140,15 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
   curl "https://<anivexa-project>.vercel.app/watch/kaa/11061/sub/kaa-1"
 - In the Laravel Vercel project set:
   ANIVEXA_BASE_URL=https://<anivexa-project>.vercel.app
-  ANIVEXA_PROVIDERS=animegg,kaa
+  ANIVEXA_PROVIDERS=anikoto,kaa,animegg
+- Keep anikoto first: it works from Vercel with a Referer header. KAA often
+  returns Cloudflare 403 on its segment hosts; AniHQ 403s from Vercel; Reanime
+  playlists are encrypted and Pahenime playlists are image-wrapped.
+- After changing provider order, refresh stored sources from the machine that
+  can reach the database:
+  php artisan animex:refresh-episode-sources --anilist=176496 --episode=1
+  Add --dry-run to preview, omit --episode to refresh all stored episodes, or
+  use --all only when intentionally refreshing every anime with an AniList ID.
 - For local testing, start Anivexa with:
   cd anivexa-server && npm install && npm start
   Then set the Laravel .env ANIVEXA_BASE_URL to http://127.0.0.1:4000 if Node

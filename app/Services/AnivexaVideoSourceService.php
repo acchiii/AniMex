@@ -376,9 +376,6 @@ class AnivexaVideoSourceService
         }
 
         $providers = $index['providers'];
-        usort($providers, function (array $left, array $right): int {
-            return $this->providerScore($right, 0) <=> $this->providerScore($left, 0);
-        });
 
         $candidates = [];
         foreach ($providers as $provider) {
