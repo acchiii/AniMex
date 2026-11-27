@@ -67,7 +67,10 @@
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $item->type }}</td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $item->status }}</td>
-                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $item->episodes_count }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div>{{ $item->episodes_count ?? 0 }}</div>
+                            <div class="text-xs text-gray-500">{{ $item->episode_rows_count ?? 0 }} loaded</div>
+                        </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $item->year }}</td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ optional($item->created_at)->format('Y-m-d') }}</td>
                         <td class="px-4 py-3">

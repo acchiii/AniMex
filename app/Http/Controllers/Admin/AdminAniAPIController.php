@@ -270,6 +270,10 @@ class AdminAniAPIController extends Controller
         }
 
         $total = count($episodes);
+        $provider = (string) ($result['provider'] ?? 'unknown');
+        $sourceLabel = strtolower($provider) === 'anilist'
+            ? 'AniList metadata (stream sources may be unavailable)'
+            : "provider ({$provider})";
         $parts = [];
         if ($created > 0) {
             $parts[] = "{$created} created";
@@ -277,7 +281,7 @@ class AdminAniAPIController extends Controller
         if ($updated > 0) {
             $parts[] = "{$updated} updated";
         }
-        $parts[] = "{$total} total from provider ({$result['provider']})";
+        $parts[] = "{$total} total from {$sourceLabel}";
 
         return redirect()
             ->route('admin.anime.episodes', $anime)

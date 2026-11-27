@@ -257,6 +257,8 @@ GQL;
             }
         }
 
+        $placeholders = $this->createPlaceholderEpisodes($anime, (int) ($parsed['episodes_count'] ?? 0));
+
         Cache::forget('hero_anime');
         Cache::forget('hero_anime_fallback');
         Cache::forget('trending_anime');
@@ -264,6 +266,36 @@ GQL;
         Cache::forget('genre_sections');
         Cache::forget('upcoming_anime');
 
-        return redirect()->route('admin.anime.edit', $anime)->with('success', "Anime imported from {$source} successfully.");
+        $message = "Anime imported from {$source} successfully.";
+        if ($placeholders > 0) {
+            $message .= " {$placeholders} episode rows created from metadata.";
+        }
+
+        return redirect()->route('admin.anime.edit', $anime)->with('success', $message);
+    }
+
+    private function createPlaceholderEpisodes(Anime $anime, int $count): int
+    {
+        if ($count <= 0) {
+            return 0;
+        }
+
+        $existing = $anime->episodes()->pluck('number')->all();
+        $created = 0;
+
+        for ($number = 1; $number <= min(1000, $count); $number++) {
+            if (in_array($number, $existing, true)) {
+                continue;
+            }
+            Episode::create([
+                'anime_id' => $anime->id,
+                'number' => $number,
+                'title' => "Episode {$number}",
+            ]);
+            $existing[] = $number;
+            $created++;
+        }
+
+        return $created;
     }
 }

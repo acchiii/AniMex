@@ -112,7 +112,7 @@ async function tryProviders(anilistId, titles) {
 
   const allTitles = [...new Set([...searchTitles, ...titles])];
 
-  const PROVIDER_TIMEOUT = 20000;
+  const PROVIDER_TIMEOUT = 5000;
 
   const promises = PROVIDER_PRIORITY.map(async (providerName) => {
     const provider = createProvider(providerName);
@@ -215,6 +215,7 @@ app.get('/meta/anilist/watch/:episodeId', async (req, res) => {
     const PROVIDER_TIMEOUT = 20000;
 
     const tryProvider = async (name) => {
+
       const provider = createProvider(name);
       const result = await withTimeout(provider.fetchEpisodeSources(episodeId), PROVIDER_TIMEOUT, name);
       if (result?.sources?.length > 0) return { providerName: name, sources: result };

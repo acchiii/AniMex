@@ -13,7 +13,7 @@ class AnilistVideoSourceService
 {
     private const LOOKUP_SECONDS = 20;
 
-    private const DISCOVERY_TIMEOUT = 6;
+    private const DISCOVERY_TIMEOUT = 8;
 
     private const WATCH_TIMEOUT = 10;
 
@@ -24,6 +24,8 @@ class AnilistVideoSourceService
     private array $infoCache = [];
 
     private ?float $deadline = null;
+
+    private ?string $lastError = null;
 
     public function __construct()
     {
@@ -144,13 +146,23 @@ class AnilistVideoSourceService
     {
         try {
             $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
+            $this->lastError = null;
             $info = $this->discover($anilistId, $animeTitle, false)['info'];
-
-            if (empty($info)) {
-                return ['error' => 'Consumet server unreachable'];
-            }
-
             $episodes = Arr::get($info, 'episodes', []);
+
+            if (empty($episodes)) {
+                $fallback = $this->fetchAniListEpisodes($anilistId, $animeTitle);
+                if (! empty($fallback['episodes'])) {
+                    return $fallback;
+                }
+
+                $error = $this->lastError ?: 'Consumet server unreachable';
+                if (! empty($fallback['error'])) {
+                    $error .= ' | AniList: '.$fallback['error'];
+                }
+
+                return ['error' => $error];
+            }
 
             return [
                 'episodes' => $episodes,
@@ -161,6 +173,88 @@ class AnilistVideoSourceService
         } catch (Throwable $e) {
             return ['error' => 'Consumet server unreachable: '.$e->getMessage()];
         }
+    }
+
+    private function fetchAniListEpisodes(int $anilistId, ?string $animeTitle): array
+    {
+        $url = rtrim((string) config('services.anilist.graphql_url', 'https://graphql.anilist.co'), '/');
+        $timeout = $this->remainingTimeout(8);
+        if ($timeout <= 0) {
+            return ['error' => 'AniList fallback timed out'];
+        }
+
+        $query = 'query ($id: Int) { Media(id: $id, type: ANIME) { id episodes title { romaji english native } streamingEpisodes { title thumbnail url site } } }';
+
+        try {
+            $response = Http::withHeaders(['Accept' => 'application/json'])
+                ->connectTimeout(3)
+                ->timeout($timeout)
+                ->post($url, ['query' => $query, 'variables' => ['id' => $anilistId]]);
+        } catch (Throwable $e) {
+            return ['error' => 'AniList fallback failed: '.$e->getMessage()];
+        }
+
+        if (! $response instanceof Response) {
+            return ['error' => 'AniList fallback failed'];
+        }
+
+        if (! $response->ok()) {
+            return ['error' => 'AniList returned HTTP '.$response->status()];
+        }
+
+        $json = $response->json();
+        $errors = Arr::get($json ?? [], 'errors', []);
+        if (! empty($errors[0]['message'])) {
+            return ['error' => 'AniList GraphQL: '.$errors[0]['message']];
+        }
+
+        $media = Arr::get($json ?? [], 'data.Media', []);
+        if (! is_array($media) || empty($media)) {
+            return ['error' => 'AniList media not found'];
+        }
+
+        $streamingEpisodes = Arr::get($media, 'streamingEpisodes', []);
+        $episodes = [];
+
+        if (is_array($streamingEpisodes)) {
+            foreach ($streamingEpisodes as $index => $episode) {
+                if (! is_array($episode)) {
+                    continue;
+                }
+                $number = $index + 1;
+                $episodes[] = [
+                    'number' => $number,
+                    'title' => Arr::get($episode, 'title') ?: "Episode {$number}",
+                    'image' => Arr::get($episode, 'thumbnail'),
+                    'description' => null,
+                    'releaseDate' => null,
+                    'url' => Arr::get($episode, 'url'),
+                ];
+            }
+        }
+
+        $metadataCount = min(1000, max(0, (int) Arr::get($media, 'episodes', 0)));
+        for ($number = count($episodes) + 1; $number <= $metadataCount; $number++) {
+            $episodes[] = [
+                'number' => $number,
+                'title' => "Episode {$number}",
+                'image' => null,
+                'description' => null,
+                'releaseDate' => null,
+                'url' => null,
+            ];
+        }
+
+        if (empty($episodes)) {
+            return ['error' => 'AniList has no episode list for this anime'];
+        }
+
+        return [
+            'episodes' => $episodes,
+            'provider' => 'AniList',
+            'totalEpisodes' => count($episodes),
+            'title' => Arr::get($media, 'title.romaji') ?: Arr::get($media, 'title.english') ?: $animeTitle,
+        ];
     }
 
     private function lookupSources(int $anilistId, int $episodeNumber, ?string $animeTitle): array
@@ -286,12 +380,17 @@ class AnilistVideoSourceService
             return ['info' => $info ?? [], 'anipub_id' => $anipubId];
         }
 
-        if ($info === null && $this->isOk($responses['info'] ?? null)) {
-            $data = $responses['info']->json();
-            if (is_array($data)) {
-                $info = $data;
-                $this->infoCache[$anilistId] = $data;
-                $this->putCache($infoKey, $data, 3600);
+        if ($info === null) {
+            $infoResponse = $responses['info'] ?? null;
+            if ($this->isOk($infoResponse)) {
+                $data = $infoResponse->json();
+                if (is_array($data)) {
+                    $info = $data;
+                    $this->infoCache[$anilistId] = $data;
+                    $this->putCache($infoKey, $data, 3600);
+                }
+            } else {
+                $this->lastError = $this->responseError($infoResponse, 'Consumet server unreachable');
             }
         }
 
@@ -523,6 +622,20 @@ class AnilistVideoSourceService
 
             return null;
         }
+    }
+
+    private function responseError(mixed $response, string $fallback): string
+    {
+        if (! $response instanceof Response) {
+            return $fallback;
+        }
+
+        $json = $response->json();
+        $message = Arr::get($json ?? [], 'error')
+            ?: Arr::get($json ?? [], 'message')
+            ?: Arr::get($json ?? [], 'errors.0.message');
+
+        return is_string($message) && $message !== '' ? $message : $fallback;
     }
 
     private function isOk(mixed $response): bool

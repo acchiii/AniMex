@@ -9,7 +9,6 @@ use App\Models\EpisodeSource;
 use App\Models\Genre;
 use App\Models\Studio;
 use App\Models\Tag;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -18,7 +17,8 @@ class AdminAnimeController extends Controller
 {
     public function index()
     {
-        $anime = Anime::withCount(['episodes'])->with('studio')->latest()->paginate(20);
+        $anime = Anime::withCount(['episodes as episode_rows_count'])->with('studio')->latest()->paginate(20);
+
         return view('admin.anime.index', compact('anime'));
     }
 
@@ -27,6 +27,7 @@ class AdminAnimeController extends Controller
         $genres = Genre::orderBy('name')->get();
         $studios = Studio::orderBy('name')->get();
         $tags = Tag::orderBy('name')->get();
+
         return view('admin.anime.create', compact('genres', 'studios', 'tags'));
     }
 
@@ -106,6 +107,7 @@ class AdminAnimeController extends Controller
         $studios = Studio::orderBy('name')->get();
         $tags = Tag::orderBy('name')->get();
         $anime->load('genres', 'tags');
+
         return view('admin.anime.edit', compact('anime', 'genres', 'studios', 'tags'));
     }
 
@@ -115,7 +117,7 @@ class AdminAnimeController extends Controller
             'title' => 'required|string|max:255',
             'title_english' => 'nullable|string|max:255',
             'title_japanese' => 'nullable|string|max:255',
-            'slug' => 'nullable|string|unique:anime,slug,' . $anime->id,
+            'slug' => 'nullable|string|unique:anime,slug,'.$anime->id,
             'synopsis' => 'nullable|string',
             'cover_image' => 'nullable|image|max:2048',
             'banner_image' => 'nullable|image|max:2048',
@@ -196,6 +198,7 @@ class AdminAnimeController extends Controller
     public function episodes(Anime $anime)
     {
         $episodes = $anime->episodes()->with('sources')->get();
+
         return view('admin.anime.episodes', compact('anime', 'episodes'));
     }
 
@@ -264,6 +267,7 @@ class AdminAnimeController extends Controller
     public function destroyEpisode(Anime $anime, Episode $episode)
     {
         $episode->delete();
+
         return redirect()->route('admin.anime.episodes', $anime)->with('success', 'Episode deleted successfully.');
     }
 

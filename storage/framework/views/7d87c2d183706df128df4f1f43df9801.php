@@ -53,6 +53,9 @@
                     </div>
                     <form action="<?php echo e(route('admin.import.anime', $item['mal_id'])); ?>" method="POST">
                         <?php echo csrf_field(); ?>
+                        <?php if(($source ?? 'jikan') === 'anilist' && ! empty($item['anilist_id'])): ?>
+                            <input type="hidden" name="anilist_id" value="<?php echo e($item['anilist_id']); ?>">
+                        <?php endif; ?>
                         <button type="submit" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium transition">Import</button>
                     </form>
                 </div>
