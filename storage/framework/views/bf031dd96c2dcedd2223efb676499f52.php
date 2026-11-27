@@ -34,12 +34,17 @@
                 <div id="subtitle-hud"></div>
             <?php else: ?>
                 <div class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                    <div class="text-center">
-                        <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
-                            </path></video>
+                    <div class="text-center" id="sources-status">
+                        <?php if($sourcesPending): ?>
+                            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500 mx-auto mb-3"></div>
+                            <p>Finding video sources...</p>
+                        <?php else: ?>
+                            <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path></svg>
                             <p>No video sources available</p>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endif; ?>
@@ -268,6 +273,32 @@
     <script>
         const sources = <?php echo json_encode($sourcesData, 15, 512) ?>;
         const subtitles = <?php echo json_encode($subtitlesData, 15, 512) ?>;
+        const sourcesPending = <?php echo json_encode($sourcesPending, 15, 512) ?>;
+        const sourcesEndpoint = <?php echo json_encode(route('anime.sources', ['anime' => $anime->slug, 'episode' => $episode->id])) ?>;
+        let sourcePolls = 0;
+
+        function pollSources() {
+            if (!sourcesPending || sourcePolls >= 12) return;
+            sourcePolls++;
+            fetch(sourcesEndpoint, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    const statusEl = document.getElementById('sources-status');
+                    if (data.status === 'ready') {
+                        window.location.reload();
+                        return;
+                    }
+                    if (data.status === 'error') {
+                        if (statusEl) statusEl.textContent = data.error || 'No video sources available';
+                        return;
+                    }
+                    setTimeout(pollSources, 2500);
+                })
+                .catch(function () { setTimeout(pollSources, 2500); });
+        }
 
         const LANG_LABELS = { 'en': 'English', 'ja': '日本語' };
         const STORAGE_KEY_SUB = 'animex_sub_lang';
@@ -493,6 +524,8 @@
         }
 
         function selectSubtitle(lang) {
+            if (!player) return;
+
             userSubChoice = true;
             activeSubLang = lang;
 
@@ -589,6 +622,8 @@
         }
 
         function setSubSize(size) {
+            if (!player) return;
+
             ['sm', 'md', 'lg'].forEach(function (s) {
                 player.classList.remove('subtitle-' + s);
             });
@@ -601,6 +636,8 @@
         }
 
         function setSubBg(bg) {
+            if (!player) return;
+
             ['off', 'semi', 'solid'].forEach(function (b) {
                 player.classList.remove('subtitle-bg-' + b);
             });
@@ -648,6 +685,7 @@
                 if (found) activeSubLang = savedLang;
             }
             loadSubSettings();
+            pollSources();
             if (sources.length > 0) loadSource(0);
             setTimeout(function () {
                 if (activeSubLang) {

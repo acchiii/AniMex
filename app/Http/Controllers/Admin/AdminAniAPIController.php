@@ -103,9 +103,11 @@ class AdminAniAPIController extends Controller
         $anilistId = (int) ($anime->anilist_id ?? 0);
         abort_if($anilistId <= 0, 422, 'Anime does not have an AniList ID');
 
-        set_time_limit(120);
-
-        $episodes = $anime->episodes()->whereDoesntHave('sources')->get();
+        $remaining = $anime->episodes()->whereDoesntHave('sources')->count();
+        $episodes = $anime->episodes()->whereDoesntHave('sources')
+            ->orderBy('number')
+            ->limit(60)
+            ->get();
 
         if ($episodes->isEmpty()) {
             return redirect()
@@ -116,28 +118,34 @@ class AdminAniAPIController extends Controller
         /** @var AnilistVideoSourceService $service */
         $service = app(AnilistVideoSourceService::class);
 
+        try {
+            $results = $service->fetchEpisodeSourcesBatch(
+                $anilistId,
+                $episodes->pluck('number')->all(),
+                $anime->title_english ?: $anime->title
+            );
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('admin.anime.episodes', $anime)
+                ->with('error', 'Import failed: source lookup could not be completed.');
+        }
+
         $imported = 0;
         $errors = [];
 
-        foreach ($episodes as $episode) {
-            try {
-                $result = $service->fetchEpisodeSources($anilistId, (int) $episode->number, $anime->title);
-            } catch (\Throwable $e) {
-                $errors[] = "Ep {$episode->number}: source lookup could not be completed";
+        DB::transaction(function () use ($episodes, $results, &$imported, &$errors) {
+            foreach ($episodes as $episode) {
+                $result = $results[(int) $episode->number] ?? null;
 
-                continue;
-            }
+                if (! $result || ! empty($result['error']) || empty($result['sources'])) {
+                    $errors[] = "Ep {$episode->number}: ".($result['error'] ?? 'No sources');
 
-            if (! empty($result['error']) || empty($result['sources'])) {
-                $errors[] = "Ep {$episode->number}: ".($result['error'] ?? 'No sources');
+                    continue;
+                }
 
-                continue;
-            }
-
-            DB::transaction(function () use ($episode, $result, &$imported) {
                 $sort = 0;
-                foreach ($result['sources'] as $s) {
-                    $url = (string) ($s['url'] ?? '');
+                foreach ($result['sources'] as $source) {
+                    $url = (string) ($source['url'] ?? '');
                     if ($url === '') {
                         continue;
                     }
@@ -145,41 +153,42 @@ class AdminAniAPIController extends Controller
                     EpisodeSource::create([
                         'episode_id' => $episode->id,
                         'video_server_id' => null,
-                        'label' => (string) ($s['label'] ?? $s['quality'] ?? '720p'),
-                        'quality' => in_array((string) ($s['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $s['quality'] : '720p',
+                        'label' => (string) ($source['label'] ?? $source['quality'] ?? '720p'),
+                        'quality' => in_array((string) ($source['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $source['quality'] : '720p',
                         'url' => $url,
-                        'headers' => $s['headers'] ?? null,
-                        'type' => (string) ($s['type'] ?? 'mp4'),
-                        'language' => (string) ($s['language'] ?? 'sub'),
+                        'headers' => $source['headers'] ?? null,
+                        'type' => (string) ($source['type'] ?? 'mp4'),
+                        'language' => (string) ($source['language'] ?? 'sub'),
                         'is_active' => true,
                         'sort_order' => $sort++,
                     ]);
                 }
 
-                foreach ($result['subtitles'] ?? [] as $t) {
-                    $filePath = (string) ($t['file_path'] ?? '');
+                foreach ($result['subtitles'] ?? [] as $subtitle) {
+                    $filePath = (string) ($subtitle['file_path'] ?? '');
                     if ($filePath === '') {
                         continue;
                     }
 
                     Subtitle::create([
                         'episode_id' => $episode->id,
-                        'language' => (string) ($t['language'] ?? 'en'),
-                        'label' => (string) ($t['label'] ?? strtoupper((string) ($t['language'] ?? 'en'))),
+                        'language' => (string) ($subtitle['language'] ?? 'en'),
+                        'label' => (string) ($subtitle['label'] ?? strtoupper((string) ($subtitle['language'] ?? 'en'))),
                         'file_path' => $filePath,
-                        'is_default' => (bool) ($t['is_default'] ?? false),
+                        'is_default' => (bool) ($subtitle['is_default'] ?? false),
                     ]);
                 }
 
                 $imported++;
-            });
-
-            usleep(500000);
-        }
+            }
+        });
 
         $message = "Imported sources for {$imported} episode(s).";
         if (! empty($errors)) {
             $message .= ' Errors: '.implode('; ', array_slice($errors, 0, 5));
+        }
+        if ($remaining > $episodes->count()) {
+            $message .= ' Run again to import the remaining episodes.';
         }
 
         return redirect()

@@ -1,15 +1,31 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\AnimeController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\AnimeController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
-
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::get('/health/db', function () {
+    try {
+        DB::select('select 1');
+        $key = 'health:check:'.uniqid();
+        Cache::put($key, 'ok', 10);
+        $cacheOk = Cache::get($key) === 'ok';
+
+        return response()->json(
+            ['database' => 'ok', 'cache' => $cacheOk ? 'ok' : 'failed'],
+            $cacheOk ? 200 : 500
+        );
+    } catch (Throwable $e) {
+        report($e);
+
+        return response()->json(['database' => 'failed', 'cache' => 'failed'], 500);
+    }
+})->name('health.db');
 
 // Anime Routes
 Route::get('/anime', [AnimeController::class, 'index'])->name('anime.index');
@@ -30,8 +46,13 @@ Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store']);
 
-use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminAniAPIController;
 use App\Http\Controllers\Admin\AdminAnimeController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminJikanController;
+use App\Http\Controllers\Admin\AdminLoginController;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 // Profile Routes
 Route::middleware(['auth'])->group(function () {
@@ -51,10 +72,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         return redirect()->route('admin.dashboard');
     })->name('login');
 
-    Route::post('/login', [\App\Http\Controllers\Admin\AdminLoginController::class, 'login'])->name('login.post');
+    Route::post('/login', [AdminLoginController::class, 'login'])->name('login.post');
 
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard')->middleware('admin');
-
 
     Route::get('/anime', [AdminAnimeController::class, 'index'])->name('anime.index');
     Route::get('/anime/create', [AdminAnimeController::class, 'create'])->name('anime.create');
@@ -68,17 +88,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/anime/{anime}/episodes/{episode}', [AdminAnimeController::class, 'updateEpisode'])->name('anime.episodes.update');
     Route::delete('/anime/{anime}/episodes/{episode}', [AdminAnimeController::class, 'destroyEpisode'])->name('anime.episodes.destroy');
 
-    Route::get('/import', [\App\Http\Controllers\Admin\AdminJikanController::class, 'search'])->name('import.search');
-    Route::post('/import/{malId}', [\App\Http\Controllers\Admin\AdminJikanController::class, 'import'])->name('import.anime');
+    Route::get('/import', [AdminJikanController::class, 'search'])->name('import.search');
+    Route::post('/import/{malId}', [AdminJikanController::class, 'import'])->name('import.anime');
 
-    Route::post('/anime/{anime}/episodes/{episode}/import-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importEpisodeSources'])->name('anime.episodes.import-sources');
-    Route::post('/anime/{anime}/import-all-sources', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'importAllEpisodeSources'])->name('anime.import-all-sources');
-    Route::post('/anime/{anime}/fetch-episode-list', [\App\Http\Controllers\Admin\AdminAniAPIController::class, 'fetchEpisodeList'])->name('anime.fetch-episode-list');
-    Route::post('/anime/{anime}/episodes/{episode}/sources', [\App\Http\Controllers\Admin\AdminAnimeController::class, 'storeSource'])->name('anime.episodes.sources.store');
-    Route::delete('/anime/{anime}/episodes/{episode}/sources/{source}', [\App\Http\Controllers\Admin\AdminAnimeController::class, 'destroySource'])->name('anime.episodes.sources.destroy');
+    Route::post('/anime/{anime}/episodes/{episode}/import-sources', [AdminAniAPIController::class, 'importEpisodeSources'])->name('anime.episodes.import-sources');
+    Route::post('/anime/{anime}/import-all-sources', [AdminAniAPIController::class, 'importAllEpisodeSources'])->name('anime.import-all-sources');
+    Route::post('/anime/{anime}/fetch-episode-list', [AdminAniAPIController::class, 'fetchEpisodeList'])->name('anime.fetch-episode-list');
+    Route::post('/anime/{anime}/episodes/{episode}/sources', [AdminAnimeController::class, 'storeSource'])->name('anime.episodes.sources.store');
+    Route::delete('/anime/{anime}/episodes/{episode}/sources/{source}', [AdminAnimeController::class, 'destroySource'])->name('anime.episodes.sources.destroy');
 });
 
 // API-like AJAX Routes
+Route::get('/anime/{anime}/episodes/{episode}/sources', [AnimeController::class, 'sources'])->name('anime.sources');
 Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
 Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
 Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
@@ -87,5 +108,3 @@ Route::get('/proxy/segment/{sourceId}', [AnimeController::class, 'proxySegment']
 Route::post('/progress', [AnimeController::class, 'saveProgress'])->name('progress.save');
 Route::get('/proxy/subtitle', [AnimeController::class, 'proxySubtitle'])->name('proxy.subtitle');
 Route::get('/subtitles/{filename}', [AnimeController::class, 'serveSubtitle'])->name('subtitle.serve');
-
-
