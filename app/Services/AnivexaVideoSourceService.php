@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\EpisodeTitle;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
@@ -65,12 +66,8 @@ class AnivexaVideoSourceService
             return ['error' => $index['error']];
         }
 
-        $best = null;
-        foreach ($index['providers'] as $provider) {
-            if ($best === null || count($provider['episodes']) > count($best['episodes'])) {
-                $best = $provider;
-            }
-        }
+        $expected = (int) Arr::get($index, 'mappings.episodes', 0);
+        $best = $this->bestEpisodeProvider($index['providers'], $expected);
 
         if ($best === null || empty($best['episodes'])) {
             return ['error' => 'Anivexa returned no episode lists'];
@@ -83,11 +80,14 @@ class AnivexaVideoSourceService
             if ($number <= 0 || isset($seen[$number])) {
                 continue;
             }
+            if (($episode['audio'] ?? 'sub') !== 'sub') {
+                continue;
+            }
             $seen[$number] = true;
 
             $episodes[] = [
                 'number' => $number,
-                'title' => $episode['title'] ?? null,
+                'title' => EpisodeTitle::title($episode['title'] ?? null, $number),
                 'image' => $episode['image'] ?? null,
                 'description' => $episode['description'] ?? null,
                 'releaseDate' => $episode['releaseDate'] ?? null,
@@ -219,6 +219,62 @@ class AnivexaVideoSourceService
         return $results;
     }
 
+    private function bestEpisodeProvider(array $providers, int $expected): ?array
+    {
+        $best = null;
+        $bestScore = -1;
+
+        foreach ($providers as $provider) {
+            $score = $this->providerScore($provider, $expected);
+            if ($score > $bestScore) {
+                $best = $provider;
+                $bestScore = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    private function providerScore(array $provider, int $expected): int
+    {
+        $subNumbers = [];
+        $hasDub = false;
+
+        foreach ($provider['episodes'] ?? [] as $episode) {
+            if (($episode['audio'] ?? 'sub') === 'dub') {
+                $hasDub = true;
+
+                continue;
+            }
+            $number = (int) ($episode['number'] ?? 0);
+            if ($number > 0) {
+                $subNumbers[$number] = $number;
+            }
+        }
+
+        $numbers = array_values($subNumbers);
+        sort($numbers, SORT_NUMERIC);
+
+        $count = count($numbers);
+        $contiguous = 0;
+        $next = 1;
+        foreach ($numbers as $number) {
+            if ($number === $next) {
+                $contiguous++;
+                $next++;
+            }
+        }
+
+        $coverage = $expected > 0 ? min($count, $expected) / $expected : 0;
+        $match = (float) Arr::get($provider, 'meta.matchScore', 0);
+
+        return ($contiguous * 1000)
+            + ($count * 100)
+            + (int) ($coverage * 500)
+            + (int) ($match * 1000)
+            + ($hasDub ? 50 : 0);
+    }
+
     private function episodeIndex(int $anilistId): array
     {
         $cacheKey = 'anivexa:episodes:'.md5($this->baseUrl.'|'.implode(',', $this->providers).'|'.$anilistId);
@@ -295,6 +351,7 @@ class AnivexaVideoSourceService
             if (! empty($episodes)) {
                 $result['providers'][] = [
                     'provider' => $provider,
+                    'meta' => Arr::get($block, 'meta', []),
                     'episodes' => $episodes,
                 ];
             }
@@ -318,8 +375,13 @@ class AnivexaVideoSourceService
             return [];
         }
 
+        $providers = $index['providers'];
+        usort($providers, function (array $left, array $right): int {
+            return $this->providerScore($right, 0) <=> $this->providerScore($left, 0);
+        });
+
         $candidates = [];
-        foreach ($index['providers'] as $provider) {
+        foreach ($providers as $provider) {
             foreach ($provider['episodes'] as $episode) {
                 $number = (int) ($episode['number'] ?? 0);
                 if ($number <= 0) {

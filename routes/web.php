@@ -135,7 +135,7 @@ Route::get('/anime/{anime}/episodes/{episode}/sources', [AnimeController::class,
 Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
 Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
 Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');
-Route::get('/proxy/source/{source}', [AnimeController::class, 'proxySource'])->name('proxy.source');
+Route::get('/proxy/source/{source}/{path?}', [AnimeController::class, 'proxySource'])->where('path', '.*')->name('proxy.source');
 Route::get('/proxy/segment/{sourceId}', [AnimeController::class, 'proxySegment'])->name('proxy.segment');
 Route::post('/progress', [AnimeController::class, 'saveProgress'])->name('progress.save');
 Route::get('/proxy/subtitle', [AnimeController::class, 'proxySubtitle'])->name('proxy.subtitle');

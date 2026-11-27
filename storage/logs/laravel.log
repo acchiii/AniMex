@@ -21237,3 +21237,5 @@ DETAIL:  Key (slug)=(madhouse) already exists. at C:/xampp/htdocs/AniMex/vendor/
 [2026-11-27 08:30:01] local.WARNING: On-the-fly source fetch failed {"anime":79,"episode":4757,"title":"Hunter x Hunter","error":"No sources found for AniList ID 136, episode 1 | Anivexa: Anivexa: no playable sources (Anivexa watch request failed)"} 
 [2026-11-27 08:50:53] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":11061,"episode":2} 
 [2026-11-27 09:42:11] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":136,"episode":1} 
+[2026-11-27 09:55:05] local.WARNING: Jimaku search failed {"anilist_id":176496,"status":400} 
+[2026-11-27 09:55:41] local.INFO: AnilistVideoSource: Found sources via Anivexa {"anilist_id":176496,"episode":1} 

@@ -462,18 +462,19 @@ class AnimeController extends Controller
         return response('', 204);
     }
 
-    public function proxySource(Request $request, EpisodeSource $source)
+    public function proxySource(Request $request, EpisodeSource $source, ?string $path = null)
     {
         @set_time_limit(120);
 
-        $url = $source->url;
+        $baseUrl = dirname($source->url);
+        $url = $path ? $this->resolveSegmentUrl($baseUrl, $path) : $source->url;
         $headers = $source->headers ?? [];
 
-        if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
+        if (! $this->isValidSourceUrl($url)) {
             return response('Invalid source URL', 502);
         }
 
-        if ($source->type === 'embed') {
+        if ($source->type === 'embed' && ! $path) {
             return redirect()->away($url);
         }
 
@@ -560,6 +561,15 @@ class AnimeController extends Controller
         }
     }
 
+    private function proxiedSegmentUrl(string $proxySegmentUrl, string $uri): string
+    {
+        if (str_contains($uri, '/proxy/segment/')) {
+            return $uri;
+        }
+
+        return $proxySegmentUrl.'?path='.urlencode($uri);
+    }
+
     private function rewriteM3u8Urls(string $body, string $proxySegmentUrl, string $originalUrl): string
     {
         $baseUrl = dirname($originalUrl);
@@ -569,37 +579,33 @@ class AnimeController extends Controller
             '/^(?!#)(\S+)/m',
             function ($m) use ($proxySegmentUrl, $baseUrl) {
                 $line = trim($m[1]);
-                if ($line === '' || str_starts_with($line, 'http://') || str_starts_with($line, 'https://')) {
-                    $path = $line;
-                } elseif (str_starts_with($line, '/')) {
-                    $parsed = parse_url($baseUrl);
-                    $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
-                    $path = $origin.$line;
-                } else {
-                    $path = rtrim($baseUrl, '/').'/'.ltrim($line, './');
+                if ($line === '') {
+                    return $m[0];
                 }
 
-                return $proxySegmentUrl.'?path='.urlencode($path);
+                $path = $this->resolveSegmentUrl($baseUrl, $line);
+
+                return $this->proxiedSegmentUrl($proxySegmentUrl, $path);
             },
             $body
         );
 
         $body = preg_replace_callback(
-            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
-            function ($m) use ($proxySegmentUrl) {
-                $uri = $m[3];
+            '/\bURI="([^"]+)"/i',
+            function ($m) use ($proxySegmentUrl, $baseUrl) {
+                $path = $this->resolveSegmentUrl($baseUrl, $m[1]);
 
-                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri).$m[4];
+                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $path).'"';
             },
             $body
         );
 
         $body = preg_replace_callback(
-            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
-            function ($m) use ($proxySegmentUrl) {
-                $uri = $m[3];
+            '/\bURI=([^\s,"\']+)/i',
+            function ($m) use ($proxySegmentUrl, $baseUrl) {
+                $path = $this->resolveSegmentUrl($baseUrl, $m[1]);
 
-                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri);
+                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $path);
             },
             $body
         );
@@ -732,46 +738,48 @@ class AnimeController extends Controller
         $pathDir = dirname($currentPath);
         $body = str_replace(["\r\n", "\r"], "\n", $body);
 
+        $resolveRelative = function (string $uri) use ($pathDir, $baseUrl): string {
+            if (str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
+                return $uri;
+            }
+
+            if (str_starts_with($uri, '/')) {
+                $parsed = parse_url($baseUrl);
+                $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
+
+                return $origin.$uri;
+            }
+
+            $prefix = ($pathDir && $pathDir !== '.' && $pathDir !== '/') ? $pathDir.'/' : '';
+
+            return $prefix.ltrim($uri, './');
+        };
+
         $body = preg_replace_callback(
             '/^(?!#)(\S+)/m',
-            function ($m) use ($proxySegmentUrl, $pathDir, $baseUrl) {
+            function ($m) use ($proxySegmentUrl, $resolveRelative) {
                 $line = trim($m[1]);
                 if ($line === '') {
                     return $m[0];
                 }
 
-                if (str_starts_with($line, 'http://') || str_starts_with($line, 'https://')) {
-                    $fullPath = $line;
-                } elseif (str_starts_with($line, '/')) {
-                    $parsed = parse_url($baseUrl);
-                    $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
-                    $fullPath = $origin.$line;
-                } else {
-                    $prefix = ($pathDir && $pathDir !== '.' && $pathDir !== '/') ? $pathDir.'/' : '';
-                    $fullPath = $prefix.ltrim($line, './');
-                }
-
-                return $proxySegmentUrl.'?path='.urlencode($fullPath);
+                return $this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($line));
             },
             $body
         );
 
         $body = preg_replace_callback(
-            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=")([^"]+)(")/i',
-            function ($m) use ($proxySegmentUrl) {
-                $uri = $m[3];
-
-                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri).$m[4];
+            '/\bURI="([^"]+)"/i',
+            function ($m) use ($proxySegmentUrl, $resolveRelative) {
+                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1])).'"';
             },
             $body
         );
 
         $body = preg_replace_callback(
-            '/(#EXT-X-KEY:|#EXT-X-MAP:)([^\n]*URI=)([^\s,"\']+)/i',
-            function ($m) use ($proxySegmentUrl) {
-                $uri = $m[3];
-
-                return $m[1].$m[2].$proxySegmentUrl.'?path='.urlencode($uri);
+            '/\bURI=([^\s,"\']+)/i',
+            function ($m) use ($proxySegmentUrl, $resolveRelative) {
+                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1]));
             },
             $body
         );

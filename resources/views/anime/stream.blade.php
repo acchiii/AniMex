@@ -75,7 +75,7 @@
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $anime->title_english ?: $anime->title }}
                 </h1>
-                <p class="text-gray-600 dark:text-gray-400">Episode {{ $episode->number }}: {{ $episode->title }}</p>
+                <p class="text-gray-600 dark:text-gray-400">{{ \App\Support\EpisodeTitle::label($episode->title, (int) $episode->number) }}</p>
             </div>
             <div class="flex items-center gap-2">
                 @if($prevEpisode)
@@ -346,7 +346,7 @@
             embedOpenLink.classList.add('hidden');
             player.classList.remove('hidden');
 
-            const proxyUrl = '{{ route("proxy.source", "") }}/' + src.id;
+            const proxyUrl = @json(route('proxy.source', ['source' => 0])).replace('/0', '/' + src.id);
             const isHls = src.type === 'hls' || String(src.url).match(/\.m3u8/i);
 
             if (isHls && Hls.isSupported()) {
@@ -451,7 +451,7 @@
         function rebuildTracks() {
             if (!player) return;
             var existingTracks = player.querySelectorAll('track');
-            existingTracks.forEach(function (t) { t.remove(); });
+            Array.prototype.forEach.call(existingTracks, function (t) { t.remove(); });
 
             subtitles.forEach(function (sub) {
                 var track = document.createElement('track');
@@ -538,9 +538,10 @@
                     activeBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
                 }
                 showSubToast('Subtitles: ' + (LANG_LABELS[lang] || lang.toUpperCase()));
-                player.textTracks.forEach(function (track) {
+                for (var i = 0; i < player.textTracks.length; i++) {
+                    var track = player.textTracks[i];
                     track.mode = (track.language === lang) ? 'showing' : 'hidden';
-                });
+                }
             } else {
                 var offBtn = document.querySelector('.sub-off');
                 if (offBtn) {
@@ -548,9 +549,9 @@
                     offBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
                 }
                 showSubToast('Subtitles: Off');
-                player.textTracks.forEach(function (track) {
-                    track.mode = 'disabled';
-                });
+                for (var i = 0; i < player.textTracks.length; i++) {
+                    player.textTracks[i].mode = 'disabled';
+                }
             }
 
             localStorage.setItem(STORAGE_KEY_SUB, lang || '');

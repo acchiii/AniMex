@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\EpisodeTitle;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
@@ -181,23 +182,24 @@ class AnilistVideoSourceService
         try {
             $this->deadline = microtime(true) + self::LOOKUP_SECONDS;
             $this->lastError = null;
+
+            $anivexaError = null;
+            if ($this->anivexa->isEnabled()) {
+                try {
+                    $anivexaList = $this->anivexa->fetchEpisodeList($anilistId);
+                    if (! empty($anivexaList['episodes'])) {
+                        return $anivexaList;
+                    }
+                    $anivexaError = $anivexaList['error'] ?? null;
+                } catch (Throwable $e) {
+                    $anivexaError = $e->getMessage();
+                }
+            }
+
             $info = $this->discover($anilistId, $animeTitle, false)['info'];
             $episodes = Arr::get($info, 'episodes', []);
 
             if (empty($episodes)) {
-                $anivexaError = null;
-                if ($this->anivexa->isEnabled()) {
-                    try {
-                        $anivexaList = $this->anivexa->fetchEpisodeList($anilistId);
-                        if (! empty($anivexaList['episodes'])) {
-                            return $anivexaList;
-                        }
-                        $anivexaError = $anivexaList['error'] ?? null;
-                    } catch (Throwable $e) {
-                        $anivexaError = $e->getMessage();
-                    }
-                }
-
                 $fallback = $this->fetchAniListEpisodes($anilistId, $animeTitle);
                 if (! empty($fallback['episodes'])) {
                     return $fallback;
@@ -214,6 +216,13 @@ class AnilistVideoSourceService
                 return ['error' => implode(' | ', $errors)];
             }
 
+            $episodes = array_map(function (array $episode): array {
+                $number = (int) ($episode['number'] ?? 0);
+                $episode['title'] = EpisodeTitle::title($episode['title'] ?? null, $number);
+
+                return $episode;
+            }, $episodes);
+
             return [
                 'episodes' => $episodes,
                 'provider' => $info['_provider'] ?? null,
@@ -221,7 +230,7 @@ class AnilistVideoSourceService
                 'title' => $info['title'] ?? null,
             ];
         } catch (Throwable $e) {
-            return ['error' => 'Consumet server unreachable: '.$e->getMessage()];
+            return ['error' => 'Episode list lookup failed: '.$e->getMessage()];
         }
     }
 
@@ -274,7 +283,7 @@ class AnilistVideoSourceService
                 $number = $index + 1;
                 $episodes[] = [
                     'number' => $number,
-                    'title' => Arr::get($episode, 'title') ?: "Episode {$number}",
+                    'title' => EpisodeTitle::title(Arr::get($episode, 'title'), $number),
                     'image' => Arr::get($episode, 'thumbnail'),
                     'description' => null,
                     'releaseDate' => null,
