@@ -518,7 +518,23 @@ class AnivexaVideoSourceService
         }
 
         $rootUrl = (string) (Arr::get($data, 'proxiedUrl') ?: Arr::get($data, 'stream_url') ?: '');
+        $rootExists = false;
         if ($rootUrl !== '') {
+            foreach ($streams as $stream) {
+                if (! is_array($stream)) {
+                    continue;
+                }
+
+                $streamUrl = (string) (Arr::get($stream, 'proxiedUrl') ?: Arr::get($stream, 'extractedUrl') ?: Arr::get($stream, 'url') ?: '');
+                if ($streamUrl === $rootUrl) {
+                    $rootExists = true;
+
+                    break;
+                }
+            }
+        }
+
+        if ($rootUrl !== '' && ! $rootExists) {
             array_unshift($streams, [
                 'url' => $rootUrl,
                 'type' => 'hls',
@@ -660,7 +676,7 @@ class AnivexaVideoSourceService
             'language' => $language,
             'label' => (string) (Arr::get($subtitle, 'label') ?: $label),
             'file_path' => $url,
-            'is_default' => $language === 'en',
+            'is_default' => (bool) (Arr::get($subtitle, 'default') ?? ($language === 'en')),
         ];
     }
 

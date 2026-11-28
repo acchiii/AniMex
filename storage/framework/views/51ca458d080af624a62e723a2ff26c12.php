@@ -11,21 +11,60 @@
                 <?php
                     $subtitleSource = $episode->sources->first(fn($s) => !empty($s->headers));
                     $subtitleSourceId = $subtitleSource->id ?? $episode->sources->first()?->id;
+
+                    $normalizeSubtitleLanguage = function ($language) {
+                        $value = strtolower((string) $language);
+                        if (str_starts_with($value, 'ja') || str_starts_with($value, 'jp')) {
+                            return 'ja';
+                        }
+                        if (str_starts_with($value, 'en')) {
+                            return 'en';
+                        }
+
+                        return null;
+                    };
+
+                    $visibleSubtitles = $episode->subtitles
+                        ->map(function ($subtitle, $index) use ($normalizeSubtitleLanguage) {
+                            $language = $normalizeSubtitleLanguage($subtitle->language);
+                            $format = strtolower((string) pathinfo((string) parse_url($subtitle->file_path, PHP_URL_PATH), PATHINFO_EXTENSION));
+                            $score = ($subtitle->is_default ? 1000 : 0)
+                                + (! $subtitle->is_default && in_array($format, ['vtt', 'srt'], true) ? 50 : 0)
+                                - (preg_match('/sign|song|ai|dubtitle/i', (string) $subtitle->label) ? 200 : 0);
+
+                            return [
+                                'language' => $language,
+                                'label' => (string) $subtitle->label,
+                                'file_path' => (string) $subtitle->file_path,
+                                'is_default' => (bool) $subtitle->is_default,
+                                'score' => $score,
+                                'position' => $index,
+                            ];
+                        })
+                        ->filter(fn($subtitle) => $subtitle['language'] !== null)
+                        ->sort(fn($a, $b) => [$b['score'], $a['position']] <=> [$a['score'], $b['position']])
+                        ->unique('language')
+                        ->sortBy(fn($subtitle) => $subtitle['language'] === 'en' ? 0 : 1)
+                        ->values();
+
+                    $defaultSubtitleLanguage = $visibleSubtitles->firstWhere('is_default', true)['language']
+                        ?? $visibleSubtitles->first()['language']
+                        ?? null;
                 ?>
                 <video id="video-player" class="w-full h-full <?php if($episode->sources->first()->type === 'embed'): ?> hidden <?php endif; ?>"
                     controls preload="metadata">
-                    <?php $__currentLoopData = $episode->subtitles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sub): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php $__currentLoopData = $visibleSubtitles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sub): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <?php
-                            $subParsed = parse_url($sub->file_path);
+                            $subParsed = parse_url($sub['file_path']);
                             $isExternal = $subParsed && isset($subParsed['host']) && $subParsed['host'] !== request()->getHost();
                             $subUrl = $isExternal
                                 ? route('proxy.subtitle', array_filter([
-                                    'url' => $sub->file_path,
+                                    'url' => $sub['file_path'],
                                     'source' => $subtitleSourceId,
                                 ]))
-                                : $sub->file_path;
+                                : $sub['file_path'];
                         ?>
-                        <track kind="subtitles" src="<?php echo e($subUrl); ?>" srclang="<?php echo e($sub->language); ?>" label="<?php echo e($sub->label); ?>" <?php if($sub->is_default): ?> default <?php endif; ?>>
+                        <track kind="subtitles" src="<?php echo e($subUrl); ?>" srclang="<?php echo e($sub['language']); ?>" label="<?php echo e($sub['label']); ?>" <?php if($sub['language'] === $defaultSubtitleLanguage): ?> default <?php endif; ?>>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </video>
                 <iframe id="embed-player" class="w-full h-full <?php if($episode->sources->first()->type !== 'embed'): ?> hidden <?php endif; ?>"
@@ -124,7 +163,7 @@
             </div>
         </div>
 
-        <?php if($episode->subtitles->count() > 0): ?>
+        <?php if($visibleSubtitles->count() > 0): ?>
             <div class="mb-4">
                 <div class="flex items-center gap-2 mb-2">
                     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Subtitles</h3>
@@ -135,15 +174,15 @@
                 <div class="flex flex-wrap gap-2 items-center" id="subtitle-buttons">
                     <button onclick="selectSubtitle(null)"
                         class="sub-btn sub-off px-3 py-1 rounded text-sm transition">Off</button>
-                    <?php $__currentLoopData = $episode->subtitles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $subtitle): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php $__currentLoopData = $visibleSubtitles; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $subtitle): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <div class="flex items-center gap-1">
-                            <button onclick="selectSubtitle('<?php echo e($subtitle->language); ?>')"
-                                class="sub-btn sub-<?php echo e($subtitle->language); ?> px-3 py-1 rounded text-sm transition">
-                                <?php echo e($subtitle->label); ?>
+                            <button onclick="selectSubtitle('<?php echo e($subtitle['language']); ?>')"
+                                class="sub-btn sub-<?php echo e($subtitle['language']); ?> px-3 py-1 rounded text-sm transition">
+                                <?php echo e($subtitle['label']); ?>
 
                             </button>
-                            <button onclick="downloadSubtitle('<?php echo e($subtitle->language); ?>')"
-                                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" title="Download <?php echo e($subtitle->label); ?> subtitles">
+                            <button onclick="downloadSubtitle('<?php echo e($subtitle['language']); ?>')"
+                                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" title="Download <?php echo e($subtitle['label']); ?> subtitles">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             </button>
                         </div>
@@ -269,10 +308,11 @@
         ])->values()->all();
 
         $proxySubtitleUrl = route('proxy.subtitle');
-        $subtitlesData = $episode->subtitles->map(fn($s) => [
-            'language' => $s->language,
-            'label' => $s->label,
-            'file_path' => $s->file_path,
+        $subtitlesData = $visibleSubtitles->map(fn($s) => [
+            'language' => $s['language'],
+            'label' => $s['label'],
+            'file_path' => $s['file_path'],
+            'is_default' => $s['is_default'],
             'proxy_path' => (function ($url) use ($proxySubtitleUrl, $subtitleSourceId) {
                 $parsed = parse_url($url);
                 return ($parsed && isset($parsed['host']) && $parsed['host'] !== request()->getHost())
@@ -281,7 +321,7 @@
                         'source' => $subtitleSourceId,
                     ]))
                     : $url;
-            })($s->file_path),
+            })($s['file_path']),
         ])->values()->all();
     ?>
     <script>
@@ -564,6 +604,30 @@
             return sub.proxy_path || sub.file_path;
         }
 
+        function defaultSubtitleLanguage() {
+            var chosen = subtitles.find(function (s) { return s.is_default; });
+            var english = subtitles.find(function (s) { return s.language === 'en'; });
+
+            return chosen ? chosen.language : (english ? 'en' : (subtitles[0] ? subtitles[0].language : null));
+        }
+
+        function desiredSubtitleLanguage() {
+            if (userSubChoice) {
+                return activeSubLang;
+            }
+
+            return activeSubLang || defaultSubtitleLanguage();
+        }
+
+        function applySubtitleModes() {
+            if (!player || !player.textTracks) return;
+            var wanted = desiredSubtitleLanguage();
+            for (var i = 0; i < player.textTracks.length; i++) {
+                var track = player.textTracks[i];
+                track.mode = (wanted && track.language === wanted) ? 'showing' : 'disabled';
+            }
+        }
+
         function rebuildTracks() {
             if (!player) return;
             var existingTracks = player.querySelectorAll('track');
@@ -579,29 +643,17 @@
                     var origUrl = getSubUrl(sub);
                     fetchAndAdjustVtt(origUrl, subtitleOffset, function (blobUrl) {
                         track.src = blobUrl;
-                        track.addEventListener('load', function () {
-                            if (player.textTracks) {
-                                for (var i = 0; i < player.textTracks.length; i++) {
-                                    var t = player.textTracks[i];
-                                    t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
-                                }
-                            }
-                        });
+                        track.addEventListener('load', applySubtitleModes);
                     });
                 } else {
                     track.src = getSubUrl(sub);
                 }
 
-                track.default = sub.language === 'en' && !activeSubLang;
+                track.default = !userSubChoice && sub.language === defaultSubtitleLanguage();
                 player.appendChild(track);
             });
 
-            if (activeSubLang && player.textTracks) {
-                for (var i = 0; i < player.textTracks.length; i++) {
-                    var t = player.textTracks[i];
-                    t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
-                }
-            }
+            applySubtitleModes();
         }
 
         function fetchAndAdjustVtt(url, offset, callback) {
@@ -654,10 +706,7 @@
                     activeBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
                 }
                 showSubToast('Subtitles: ' + (LANG_LABELS[lang] || lang.toUpperCase()));
-                for (var i = 0; i < player.textTracks.length; i++) {
-                    var track = player.textTracks[i];
-                    track.mode = (track.language === lang) ? 'showing' : 'hidden';
-                }
+                applySubtitleModes();
             } else {
                 var offBtn = document.querySelector('.sub-off');
                 if (offBtn) {
@@ -665,9 +714,7 @@
                     offBtn.style.boxShadow = '0 0 0 2px rgb(168 85 247)';
                 }
                 showSubToast('Subtitles: Off');
-                for (var i = 0; i < player.textTracks.length; i++) {
-                    player.textTracks[i].mode = 'disabled';
-                }
+                applySubtitleModes();
             }
 
             localStorage.setItem(STORAGE_KEY_SUB, lang || '');
@@ -794,9 +841,15 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             var savedLang = localStorage.getItem(STORAGE_KEY_SUB);
-            if (savedLang) {
-                var found = subtitles.some(function (s) { return s.language === savedLang; });
-                if (found) activeSubLang = savedLang;
+            if (savedLang !== null) {
+                userSubChoice = true;
+                if (savedLang === '') {
+                    activeSubLang = null;
+                } else if (subtitles.some(function (s) { return s.language === savedLang; })) {
+                    activeSubLang = savedLang;
+                }
+            } else {
+                activeSubLang = defaultSubtitleLanguage();
             }
             loadSubSettings();
             pollSources();
@@ -804,12 +857,10 @@
             setTimeout(function () {
                 if (activeSubLang) {
                     selectSubtitle(activeSubLang);
-                } else if (subtitles.length > 0) {
-                    var enSub = subtitles.find(function (s) { return s.language === 'en'; });
-                    if (enSub) {
-                        activeSubLang = 'en';
-                        selectSubtitle('en');
-                    }
+                } else if (userSubChoice && subtitles.length > 0) {
+                    selectSubtitle(null);
+                } else {
+                    applySubtitleModes();
                 }
             }, 1000);
         });
@@ -850,24 +901,13 @@
             });
             player.addEventListener('loadedmetadata', function () {
                 console.log('Video loaded, duration:', player.duration);
-                if (!userSubChoice && !activeSubLang && subtitles.length > 0) {
-                    var enSub = subtitles.find(function (s) { return s.language === 'en'; });
-                    if (enSub) {
-                        activeSubLang = 'en';
-                        setTimeout(function () { selectSubtitle('en'); }, 500);
-                    }
-                } else if (activeSubLang) {
+                if (activeSubLang) {
                     setTimeout(function () { selectSubtitle(activeSubLang); }, 500);
+                } else {
+                    setTimeout(applySubtitleModes, 500);
                 }
             });
-            player.textTracks.addEventListener('addtrack', function () {
-                if (!userSubChoice && activeSubLang) {
-                    for (var i = 0; i < player.textTracks.length; i++) {
-                        var t = player.textTracks[i];
-                        t.mode = (t.language === activeSubLang) ? 'showing' : 'hidden';
-                    }
-                }
-            });
+            player.textTracks.addEventListener('addtrack', applySubtitleModes);
         }
 
         function saveProgress(progress, duration) {

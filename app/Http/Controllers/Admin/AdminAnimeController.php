@@ -9,6 +9,7 @@ use App\Models\EpisodeSource;
 use App\Models\Genre;
 use App\Models\Studio;
 use App\Models\Tag;
+use App\Services\EpisodeSourceStoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -292,18 +293,27 @@ class AdminAnimeController extends Controller
             }
         }
 
-        $source = EpisodeSource::create([
-            'episode_id' => $episode->id,
-            'video_server_id' => null,
-            'label' => $validated['label'] ?? $validated['quality'],
-            'quality' => $validated['quality'],
-            'url' => $validated['url'],
-            'headers' => $headers,
-            'type' => $validated['type'],
-            'language' => $validated['language'],
-            'is_active' => true,
-            'sort_order' => $episode->sources()->max('sort_order') + 1,
-        ]);
+        $metadata = null;
+        if ($request->filled('metadata')) {
+            $decoded = json_decode($request->input('metadata'), true);
+            if (is_array($decoded)) {
+                $metadata = $decoded;
+            }
+        }
+
+        app(EpisodeSourceStoreService::class)->store($episode, [
+            'sources' => [[
+                'label' => $validated['label'] ?? $validated['quality'],
+                'quality' => $validated['quality'],
+                'url' => $validated['url'],
+                'headers' => $headers,
+                'metadata' => $metadata,
+                'provider' => $metadata['provider'] ?? null,
+                'type' => $validated['type'],
+                'language' => $validated['language'],
+                'is_active' => true,
+            ]],
+        ], false);
 
         return redirect()->route('admin.anime.episodes', $anime)->with('success', 'Source added successfully.');
     }

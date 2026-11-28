@@ -14,12 +14,12 @@ use App\Models\Studio;
 use App\Models\Subtitle;
 use App\Models\WatchHistory;
 use App\Services\AnilistVideoSourceService;
+use App\Services\EpisodeSourceStoreService;
 use App\Services\JimakuService;
 use App\Services\OpenSubtitlesService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -277,48 +277,7 @@ class AnimeController extends Controller
 
     private function storeSources($episode, array $result): void
     {
-        DB::transaction(function () use ($episode, $result) {
-            $sort = 0;
-            foreach ($result['sources'] as $source) {
-                $url = (string) ($source['url'] ?? '');
-                if ($url === '' || ! $this->isValidSourceUrl($url)) {
-                    continue;
-                }
-
-                $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : null;
-                EpisodeSource::create([
-                    'episode_id' => $episode->id,
-                    'video_server_id' => null,
-                    'label' => (string) ($source['label'] ?? $source['quality'] ?? '720p'),
-                    'quality' => in_array((string) ($source['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $source['quality'] : '720p',
-                    'url' => $url,
-                    'headers' => $source['headers'] ?? null,
-                    'metadata' => $metadata,
-                    'provider' => (string) ($source['provider'] ?? ($metadata['provider'] ?? '')),
-                    'expires_at' => now()->addSeconds(60),
-                    'type' => (string) ($source['type'] ?? 'hls'),
-                    'language' => (string) ($source['language'] ?? 'sub'),
-                    'is_active' => true,
-                    'sort_order' => $sort++,
-                ]);
-            }
-
-            foreach ($result['subtitles'] ?? [] as $subtitle) {
-                $filePath = (string) ($subtitle['file_path'] ?? '');
-                $language = (string) ($subtitle['language'] ?? 'en');
-                if ($filePath === '' || ! in_array($language, ['en', 'ja'], true)) {
-                    continue;
-                }
-
-                Subtitle::create([
-                    'episode_id' => $episode->id,
-                    'language' => $language,
-                    'label' => (string) ($subtitle['label'] ?? strtoupper($language)),
-                    'file_path' => $filePath,
-                    'is_default' => $language === 'en',
-                ]);
-            }
-        });
+        app(EpisodeSourceStoreService::class)->store($episode, $result, false);
     }
 
     // ─── API-like Actions (for AJAX) ────────────────────────────────────────────
@@ -1066,21 +1025,105 @@ class AnimeController extends Controller
                 ->get($url);
 
             if (! $resp->successful()) {
-                abort(502, 'Failed to fetch subtitle');
+                return response('Failed to fetch subtitle', 502);
             }
 
             $content = $resp->body();
-            $mime = 'text/vtt; charset=utf-8';
+            $extension = strtolower((string) pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+
+            if ($extension === 'ass' || str_starts_with(ltrim($content), '[Script Info]')) {
+                $content = $this->assToVtt($content);
+            } elseif ($extension === 'srt' || preg_match('/^\d+\R\d{2}:\d{2}:\d{2}/', ltrim($content))) {
+                $content = $this->srtToVtt($content);
+            }
+
+            $content = $this->limitVtt($content);
 
             return response($content, 200, [
-                'Content-Type' => $mime,
+                'Content-Type' => 'text/vtt; charset=utf-8',
                 'Content-Length' => strlen($content),
                 'Cache-Control' => 'public, max-age=86400',
                 'Access-Control-Allow-Origin' => '*',
             ]);
-        } catch (\Exception $e) {
-            abort(502, 'Subtitle proxy error: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            return response('Subtitle proxy error', 502);
         }
+    }
+
+    private function assToVtt(string $content): string
+    {
+        $lines = preg_split('/\R/u', $content) ?: [];
+        $vtt = ['WEBVTT'];
+
+        foreach ($lines as $line) {
+            if (! str_starts_with($line, 'Dialogue:')) {
+                continue;
+            }
+
+            $parts = explode(',', $line, 10);
+            if (count($parts) < 10) {
+                continue;
+            }
+
+            $text = preg_replace('/\{[^}]*\}/u', '', $parts[9]) ?? '';
+            $text = str_replace(['\\N', '\\n', '\\h'], ["\n", "\n", ' '], $text);
+            $text = trim($text);
+            if ($text === '') {
+                continue;
+            }
+
+            $vtt[] = $this->assTimestamp($parts[1]).' --> '.$this->assTimestamp($parts[2]);
+            $vtt[] = $text;
+            $vtt[] = '';
+        }
+
+        return implode("\n", $vtt)."\n";
+    }
+
+    private function assTimestamp(string $value): string
+    {
+        $parts = explode(':', trim($value));
+        if (count($parts) !== 3) {
+            return '00:00:00.000';
+        }
+
+        $seconds = explode('.', $parts[2]);
+        $fraction = $seconds[1] ?? '0';
+        $milliseconds = strlen($fraction) >= 3
+            ? (int) substr($fraction, 0, 3)
+            : min(999, (int) $fraction * 10);
+
+        return sprintf(
+            '%02d:%02d:%02d.%03d',
+            min(99, max(0, (int) $parts[0])),
+            min(59, max(0, (int) $parts[1])),
+            min(59, max(0, (int) ($seconds[0] ?? 0))),
+            $milliseconds
+        );
+    }
+
+    private function srtToVtt(string $content): string
+    {
+        $content = preg_replace('/^\xEF\xBB\xBF/', '', $content) ?? $content;
+        $content = preg_replace('/\R/', "\n", $content) ?? $content;
+        $content = preg_replace('/\n\d+\n(?=\d{2}:\d{2}:\d{2})/', "\n", $content) ?? $content;
+        $content = preg_replace('/(\d{2}:\d{2}:\d{2}),(\d{3})/', '$1.$2', $content) ?? $content;
+
+        return "WEBVTT\n\n".ltrim($content);
+    }
+
+    private function limitVtt(string $content, int $limit = 4000000): string
+    {
+        if (strlen($content) <= $limit) {
+            return $content;
+        }
+
+        $cut = strrpos(substr($content, 0, $limit), "\n\n");
+        if ($cut === false) {
+            $cut = $limit;
+        }
+
+        return rtrim(substr($content, 0, $cut))."\n\n";
     }
 
     public function serveSubtitle(string $filename)

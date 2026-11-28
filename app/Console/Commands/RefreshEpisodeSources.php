@@ -4,12 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\Anime;
 use App\Models\Episode;
-use App\Models\EpisodeSource;
-use App\Models\Subtitle;
 use App\Services\AnilistVideoSourceService;
 use App\Services\AnivexaVideoSourceService;
+use App\Services\EpisodeSourceStoreService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class RefreshEpisodeSources extends Command
@@ -18,7 +16,7 @@ class RefreshEpisodeSources extends Command
 
     protected $description = 'Replace stored episode sources with the configured Anivexa providers';
 
-    public function handle(AnilistVideoSourceService $service, AnivexaVideoSourceService $anivexa): int
+    public function handle(AnilistVideoSourceService $service, AnivexaVideoSourceService $anivexa, EpisodeSourceStoreService $store): int
     {
         if (! $anivexa->isEnabled()) {
             $this->error('Anivexa is not configured. Set ANIVEXA_BASE_URL first.');
@@ -45,7 +43,7 @@ class RefreshEpisodeSources extends Command
         $updated = 0;
         $failed = 0;
 
-        $query->chunkById(10, function ($animes) use ($service, $numbers, $dryRun, &$updated, &$failed): void {
+        $query->chunkById(10, function ($animes) use ($service, $store, $numbers, $dryRun, &$updated, &$failed): void {
             foreach ($animes as $anime) {
                 $episodeQuery = Episode::query()->where('anime_id', $anime->id);
                 if ($numbers) {
@@ -87,51 +85,7 @@ class RefreshEpisodeSources extends Command
                     }
 
                     if (! $dryRun) {
-                        DB::transaction(function () use ($episode, $sources, $result): void {
-                            EpisodeSource::query()->where('episode_id', $episode->id)->delete();
-                            Subtitle::query()->where('episode_id', $episode->id)->delete();
-
-                            $sort = 0;
-                            foreach ($sources as $source) {
-                                $quality = (string) ($source['quality'] ?? '720p');
-                                $url = (string) ($source['url'] ?? '');
-                                if ($url === '') {
-                                    continue;
-                                }
-
-                                $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : null;
-                                EpisodeSource::create([
-                                    'episode_id' => $episode->id,
-                                    'video_server_id' => null,
-                                    'label' => (string) ($source['label'] ?? $quality),
-                                    'quality' => in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true) ? $quality : '720p',
-                                    'url' => $url,
-                                    'headers' => $source['headers'] ?? null,
-                                    'metadata' => $metadata,
-                                    'provider' => (string) ($source['provider'] ?? ($metadata['provider'] ?? '')),
-                                    'expires_at' => now()->addSeconds(60),
-                                    'type' => (string) ($source['type'] ?? 'mp4'),
-                                    'language' => (string) ($source['language'] ?? 'sub'),
-                                    'is_active' => (bool) ($source['is_active'] ?? true),
-                                    'sort_order' => $sort++,
-                                ]);
-                            }
-
-                            foreach ($result['subtitles'] ?? [] as $subtitle) {
-                                $filePath = (string) ($subtitle['file_path'] ?? '');
-                                if ($filePath === '') {
-                                    continue;
-                                }
-
-                                Subtitle::create([
-                                    'episode_id' => $episode->id,
-                                    'language' => (string) ($subtitle['language'] ?? 'en'),
-                                    'label' => (string) ($subtitle['label'] ?? strtoupper((string) ($subtitle['language'] ?? 'en'))),
-                                    'file_path' => $filePath,
-                                    'is_default' => (bool) ($subtitle['is_default'] ?? false),
-                                ]);
-                            }
-                        });
+                        $store->store($episode, $result);
                     }
 
                     $updated++;
