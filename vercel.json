@@ -31,6 +31,7 @@
     "CACHE_STORE": "database",
     "CACHE_DRIVER": "database",
     "SESSION_DRIVER": "cookie",
-    "LOG_CHANNEL": "stderr"
+    "LOG_CHANNEL": "stderr",
+    "ANIVEXA_PROVIDERS": "anihq,reanime,anikoto,animegg,animenosub,anizone,aniwaves,pahenime,kaa,animedunya,animeonsen,anipm"
   }
 }

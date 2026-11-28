@@ -8,10 +8,6 @@ return [
         'secret_key' => env('RECAPTCHA_SECRET_KEY', ''),
     ],
 
-    'consumet' => [
-        'base_url' => env('CONSUMET_BASE_URL', 'https://animex-consumet.vercel.app'),
-    ],
-
     'anipub' => [
         'base_url' => env('ANIPUB_BASE_URL', 'https://anipub.xyz'),
     ],
@@ -28,7 +24,7 @@ return [
         'base_url' => env('ANIVEXA_BASE_URL', ''),
         'providers' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('ANIVEXA_PROVIDERS', 'anikoto,kaa,animegg'))
+            explode(',', (string) env('ANIVEXA_PROVIDERS', 'anihq,reanime,anikoto,animegg,animenosub,anizone,aniwaves,pahenime,kaa,animedunya,animeonsen,anipm'))
         ))),
     ],
 

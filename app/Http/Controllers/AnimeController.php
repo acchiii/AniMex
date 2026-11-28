@@ -219,6 +219,14 @@ class AnimeController extends Controller
         return response()->json($this->fetchSourcesOnTheFly($anime, $episode));
     }
 
+    public function sourceFailed(EpisodeSource $source)
+    {
+        $source->increment('failure_count');
+        $source->forceFill(['last_failed_at' => now()])->save();
+
+        return response()->json(['status' => 'ok']);
+    }
+
     private function fetchSourcesOnTheFly($anime, $episode): array
     {
         try {
@@ -277,6 +285,7 @@ class AnimeController extends Controller
                     continue;
                 }
 
+                $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : null;
                 EpisodeSource::create([
                     'episode_id' => $episode->id,
                     'video_server_id' => null,
@@ -284,6 +293,9 @@ class AnimeController extends Controller
                     'quality' => in_array((string) ($source['quality'] ?? '720p'), ['360p', '480p', '720p', '1080p', '4K'], true) ? $source['quality'] : '720p',
                     'url' => $url,
                     'headers' => $source['headers'] ?? null,
+                    'metadata' => $metadata,
+                    'provider' => (string) ($source['provider'] ?? ($metadata['provider'] ?? '')),
+                    'expires_at' => now()->addSeconds(60),
                     'type' => (string) ($source['type'] ?? 'hls'),
                     'language' => (string) ($source['language'] ?? 'sub'),
                     'is_active' => true,
@@ -464,11 +476,12 @@ class AnimeController extends Controller
 
     public function proxySource(Request $request, EpisodeSource $source, ?string $path = null)
     {
-        @set_time_limit(120);
+        @set_time_limit(60);
 
         $baseUrl = dirname($source->url);
         $url = $path ? $this->resolveSegmentUrl($baseUrl, $path) : $source->url;
         $headers = $source->headers ?? [];
+        $metadata = $this->sourceMetadata($source);
 
         if (! $this->isValidSourceUrl($url)) {
             return response('Invalid source URL', 502);
@@ -513,13 +526,22 @@ class AnimeController extends Controller
             $contentRange = $psrResponse->getHeaderLine('Content-Range');
             $bodyStream = $psrResponse->getBody();
 
-            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8');
+            $isHlsSource = $source->type === 'hls' || preg_match('/\.m3u8(?:[?#]|$)/i', $source->url) === 1;
+            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($url, '.m3u8') || str_contains($url, 'master.txt');
 
             if ($isM3u8 && ! $range) {
                 $body = $bodyStream->getContents();
                 if (empty($body)) {
                     return response('', 502);
                 }
+
+                $wrapperOffsets = is_array($metadata['wrapper_offsets'] ?? null) ? $metadata['wrapper_offsets'] : [];
+                $body = $this->decodePlaylist($body, $metadata['playlist_key'] ?? null);
+                $body = $this->unwrapPayload($body, $wrapperOffsets['manifest'] ?? null, '#EXTM3U');
+                if (! str_contains($body, '#EXTM3U')) {
+                    return response('Invalid playlist response', 502);
+                }
+
                 $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
                 $body = $this->rewriteM3u8Urls($body, $proxySegmentUrl, $url);
                 $contentLength = null;
@@ -532,6 +554,22 @@ class AnimeController extends Controller
                 ]);
 
                 return response($body, 200, $respHeaders);
+            }
+
+            if ($path && ($isHlsSource || $isM3u8)) {
+                $body = $bodyStream->getContents();
+                $wrapperOffsets = is_array($metadata['wrapper_offsets'] ?? null) ? $metadata['wrapper_offsets'] : [];
+                $body = $this->unwrapPayload($body, $wrapperOffsets['segment'] ?? null, "\x47");
+                if (! $this->isPlayableSegment($body, (bool) $request->boolean('encrypted'))) {
+                    return response('Invalid segment payload', 502);
+                }
+
+                return $this->streamString($body, 200, [
+                    'Content-Type' => 'video/MP2T',
+                    'Content-Length' => (string) strlen($body),
+                    'Cache-Control' => 'public, max-age=3600',
+                    'Access-Control-Allow-Origin' => '*',
+                ]);
             }
 
             $respHeaders = array_filter([
@@ -547,7 +585,7 @@ class AnimeController extends Controller
                 $respHeaders['Content-Range'] = $contentRange;
             }
 
-            $responseStatus = $range ? 206 : 200;
+            $responseStatus = $psrResponse->getStatusCode();
 
             return response()->stream(function () use ($bodyStream) {
                 while (! $bodyStream->eof()) {
@@ -561,23 +599,26 @@ class AnimeController extends Controller
         }
     }
 
-    private function proxiedSegmentUrl(string $proxySegmentUrl, string $uri): string
+    private function proxiedSegmentUrl(string $proxySegmentUrl, string $uri, bool $encrypted = false): string
     {
         if (str_contains($uri, '/proxy/segment/')) {
             return $uri;
         }
 
-        return $proxySegmentUrl.'?path='.urlencode($uri);
+        $url = $proxySegmentUrl.'?path='.urlencode($uri);
+
+        return $encrypted ? $url.'&encrypted=1' : $url;
     }
 
     private function rewriteM3u8Urls(string $body, string $proxySegmentUrl, string $originalUrl): string
     {
         $baseUrl = dirname($originalUrl);
         $body = str_replace(["\r\n", "\r"], "\n", $body);
+        $encrypted = str_contains($body, '#EXT-X-KEY');
 
         $body = preg_replace_callback(
             '/^(?!#)(\S+)/m',
-            function ($m) use ($proxySegmentUrl, $baseUrl) {
+            function ($m) use ($proxySegmentUrl, $baseUrl, $encrypted) {
                 $line = trim($m[1]);
                 if ($line === '') {
                     return $m[0];
@@ -585,27 +626,27 @@ class AnimeController extends Controller
 
                 $path = $this->resolveSegmentUrl($baseUrl, $line);
 
-                return $this->proxiedSegmentUrl($proxySegmentUrl, $path);
+                return $this->proxiedSegmentUrl($proxySegmentUrl, $path, $encrypted);
             },
             $body
         );
 
         $body = preg_replace_callback(
             '/\bURI="([^"]+)"/i',
-            function ($m) use ($proxySegmentUrl, $baseUrl) {
+            function ($m) use ($proxySegmentUrl, $baseUrl, $encrypted) {
                 $path = $this->resolveSegmentUrl($baseUrl, $m[1]);
 
-                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $path).'"';
+                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $path, $encrypted).'"';
             },
             $body
         );
 
         $body = preg_replace_callback(
             '/\bURI=([^\s,"\']+)/i',
-            function ($m) use ($proxySegmentUrl, $baseUrl) {
+            function ($m) use ($proxySegmentUrl, $baseUrl, $encrypted) {
                 $path = $this->resolveSegmentUrl($baseUrl, $m[1]);
 
-                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $path);
+                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $path, $encrypted);
             },
             $body
         );
@@ -631,13 +672,13 @@ class AnimeController extends Controller
     private function resolveSegmentUrl(string $baseUrl, string $path): string
     {
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
+            return $this->normalizeUrlPath($path);
         }
 
         if (str_starts_with($path, '//')) {
             $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?: 'https';
 
-            return $scheme.':'.$path;
+            return $this->normalizeUrlPath($scheme.':'.$path);
         }
 
         $query = '';
@@ -652,10 +693,129 @@ class AnimeController extends Controller
             $parsed = parse_url($baseUrl);
             $origin = ($parsed['scheme'] ?? 'https').'://'.($parsed['host'] ?? '');
 
-            return $origin.$path.$query;
+            return $this->normalizeUrlPath($origin.$path.$query);
         }
 
-        return rtrim($baseUrl, '/').'/'.ltrim($path, '/').$query;
+        return $this->normalizeUrlPath(rtrim($baseUrl, '/').'/'.ltrim($path, '/').$query);
+    }
+
+    private function sourceMetadata(EpisodeSource $source): array
+    {
+        $metadata = $source->metadata;
+
+        return is_array($metadata) ? $metadata : [];
+    }
+
+    private function unwrapPayload(string $body, mixed $offset, string $needle): string
+    {
+        if (! is_numeric($offset)) {
+            return $body;
+        }
+
+        $offset = (int) $offset;
+        if ($offset <= 0 || $offset >= strlen($body)) {
+            return $body;
+        }
+
+        $unwrapped = substr($body, $offset);
+
+        return str_contains($unwrapped, $needle) ? $unwrapped : $body;
+    }
+
+    private function decodePlaylist(string $body, mixed $playlistKey): string
+    {
+        if (str_contains($body, '#EXTM3U') || ! is_string($playlistKey) || $playlistKey === '') {
+            return $body;
+        }
+
+        $trimmed = trim($body);
+        $decoded = base64_decode($trimmed, true);
+        if ($decoded === false || $decoded === '') {
+            return $body;
+        }
+
+        if (str_contains($decoded, '#EXTM3U')) {
+            return $decoded;
+        }
+
+        $key = base64_decode($playlistKey, true);
+        if ($key === false || $key === '') {
+            $key = $playlistKey;
+        }
+
+        if ($key === '') {
+            return $body;
+        }
+
+        $xor = '';
+        $keyLength = strlen($key);
+        for ($i = 0, $length = strlen($decoded); $i < $length; $i++) {
+            $xor .= $decoded[$i] ^ $key[$i % $keyLength];
+        }
+
+        return str_contains($xor, '#EXTM3U') ? $xor : $body;
+    }
+
+    private function isKeyRequest(string $path): bool
+    {
+        $pathOnly = parse_url($path, PHP_URL_PATH) ?: $path;
+        $name = basename((string) $pathOnly);
+
+        return preg_match('/^key(?:\.[^.]+)?$/i', $name) === 1
+            || preg_match('/\.key$/i', $name) === 1;
+    }
+
+    private function isPlayableSegment(string $body, bool $encrypted = false): bool
+    {
+        if ($encrypted) {
+            return strlen($body) >= 16 && strlen($body) % 16 === 0;
+        }
+
+        return $this->isTsPayload($body);
+    }
+
+    private function isTsPayload(string $body): bool
+    {
+        return strlen($body) >= 188
+            && ord($body[0]) === 0x47
+            && ord($body[188]) === 0x47;
+    }
+
+    private function streamString(string $body, int $status, array $headers)
+    {
+        return response()->stream(function () use ($body) {
+            echo $body;
+            flush();
+        }, $status, $headers);
+    }
+
+    private function normalizeUrlPath(string $url): string
+    {
+        $parsed = parse_url($url);
+        if (! is_array($parsed) || empty($parsed['path'])) {
+            return $url;
+        }
+
+        $segments = [];
+        foreach (explode('/', (string) $parsed['path']) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($segments);
+
+                continue;
+            }
+            $segments[] = $segment;
+        }
+
+        $scheme = isset($parsed['scheme']) ? $parsed['scheme'].'://' : '';
+        $host = (string) ($parsed['host'] ?? '');
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
+        $fragment = isset($parsed['fragment']) ? '#'.$parsed['fragment'] : '';
+
+        return $scheme.$host.$port.'/'.implode('/', $segments).$query.$fragment;
     }
 
     private function normalizeSegmentUrl(string $url): string
@@ -665,7 +825,7 @@ class AnimeController extends Controller
             return $url;
         }
 
-        if (! preg_match('#/seg-[^/]+\.(?:jpe?g|html?|js|css|txt|png|webp|gif)$#i', $parsed['path'])) {
+        if (! preg_match('#(?:^|/)[^/]*(?:seg|segment|chunk|frag)[^/]*\.(?:jpe?g|html?|js|css|txt|png|webp|gif)$#i', $parsed['path'])) {
             return $url;
         }
 
@@ -677,12 +837,12 @@ class AnimeController extends Controller
         $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
         $fragment = isset($parsed['fragment']) ? '#'.$parsed['fragment'] : '';
 
-        return $scheme.$host.$port.$parsed['path'].$query.$fragment;
+        return $this->normalizeUrlPath($scheme.$host.$port.$parsed['path'].$query.$fragment);
     }
 
     public function proxySegment(Request $request, $sourceId)
     {
-        @set_time_limit(240);
+        @set_time_limit(60);
 
         $source = EpisodeSource::findOrFail($sourceId);
         $path = $request->query('path');
@@ -690,6 +850,7 @@ class AnimeController extends Controller
             abort(400, 'Missing path parameter');
         }
 
+        $metadata = $this->sourceMetadata($source);
         $baseUrl = dirname($source->url);
         $segmentUrl = $this->resolveSegmentUrl($baseUrl, $path);
         $fetchUrls = array_values(array_unique([$this->normalizeSegmentUrl($segmentUrl), $segmentUrl]));
@@ -712,26 +873,40 @@ class AnimeController extends Controller
             $psrResponse = null;
             $lastError = 'Segment fetch failed';
 
-            foreach ($fetchUrls as $fetchUrl) {
-                try {
-                    $candidate = Http::withHeaders($headers)
-                        ->connectTimeout(10)
-                        ->timeout(120)
-                        ->send('GET', $fetchUrl, ['stream' => true])
-                        ->toPsrResponse();
-
-                    $status = $candidate->getStatusCode();
-                    if ($status >= 200 && $status < 300) {
-                        $psrResponse = $candidate;
-
-                        break;
+            try {
+                $responses = Http::pool(function ($pool) use ($fetchUrls, $headers) {
+                    foreach ($fetchUrls as $index => $fetchUrl) {
+                        $pool->as((string) $index)
+                            ->withHeaders($headers)
+                            ->connectTimeout(8)
+                            ->timeout(20)
+                            ->get($fetchUrl);
                     }
+                });
 
-                    $lastError = 'Segment fetch failed with status '.$status;
-                    $candidate->getBody()->close();
-                } catch (\Throwable $e) {
-                    $lastError = 'Segment fetch error: '.$e->getMessage();
+                foreach ($fetchUrls as $index => $fetchUrl) {
+                    try {
+                        $response = $responses[(string) $index] ?? null;
+                        if (! $response) {
+                            continue;
+                        }
+
+                        $candidate = $response->toPsrResponse();
+                        $status = $candidate->getStatusCode();
+                        if ($status >= 200 && $status < 300) {
+                            $psrResponse = $candidate;
+
+                            break;
+                        }
+
+                        $lastError = 'Segment fetch failed with status '.$status;
+                        $candidate->getBody()->close();
+                    } catch (\Throwable $e) {
+                        $lastError = 'Segment fetch error: '.$e->getMessage();
+                    }
                 }
+            } catch (\Throwable $e) {
+                $lastError = 'Segment fetch error: '.$e->getMessage();
             }
 
             if (! $psrResponse) {
@@ -741,13 +916,34 @@ class AnimeController extends Controller
             $contentType = $psrResponse->getHeaderLine('Content-Type');
             $bodyStream = $psrResponse->getBody();
 
-            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl')) || str_ends_with($path, '.m3u8');
+            if ($this->isKeyRequest((string) $path)) {
+                $body = $bodyStream->getContents();
+
+                return $this->streamString($body, 200, [
+                    'Content-Type' => 'application/octet-stream',
+                    'Content-Length' => (string) strlen($body),
+                    'Cache-Control' => 'public, max-age=3600',
+                    'Access-Control-Allow-Origin' => '*',
+                ]);
+            }
+
+            $isM3u8 = ($contentType && str_contains($contentType, 'mpegurl'))
+                || str_ends_with($path, '.m3u8')
+                || str_contains($path, 'master.txt');
 
             if ($isM3u8) {
                 $body = $bodyStream->getContents();
                 if (empty($body)) {
                     abort(502, 'Empty playlist response');
                 }
+
+                $wrapperOffsets = is_array($metadata['wrapper_offsets'] ?? null) ? $metadata['wrapper_offsets'] : [];
+                $body = $this->decodePlaylist($body, $metadata['playlist_key'] ?? null);
+                $body = $this->unwrapPayload($body, $wrapperOffsets['manifest'] ?? null, '#EXTM3U');
+                if (! str_contains($body, '#EXTM3U')) {
+                    abort(502, 'Invalid playlist response');
+                }
+
                 $proxySegmentUrl = route('proxy.segment', ['sourceId' => $source->id]);
                 $body = $this->rewriteM3u8UrlsForSubPlaylist($body, $proxySegmentUrl, $path, $baseUrl);
 
@@ -758,26 +954,19 @@ class AnimeController extends Controller
                 ]);
             }
 
-            if ($contentType) {
-                $lower = strtolower($contentType);
-                if (str_contains($lower, 'text/html') || str_contains($lower, 'text/plain')) {
-                    abort(502, 'Invalid segment content type: '.$contentType);
-                }
+            $body = $bodyStream->getContents();
+            $wrapperOffsets = is_array($metadata['wrapper_offsets'] ?? null) ? $metadata['wrapper_offsets'] : [];
+            $body = $this->unwrapPayload($body, $wrapperOffsets['segment'] ?? null, "\x47");
+            if (! $this->isPlayableSegment($body, (bool) $request->boolean('encrypted'))) {
+                abort(502, 'Invalid segment payload');
             }
 
-            $respHeaders = [
-                'Content-Type' => $contentType ?: 'video/MP2T',
+            return $this->streamString($body, 200, [
+                'Content-Type' => 'video/MP2T',
+                'Content-Length' => (string) strlen($body),
                 'Cache-Control' => 'public, max-age=3600',
                 'Access-Control-Allow-Origin' => '*',
-            ];
-
-            return response()->stream(function () use ($bodyStream) {
-                while (! $bodyStream->eof()) {
-                    echo $bodyStream->read(8192);
-                    flush();
-                }
-                $bodyStream->close();
-            }, 200, $respHeaders);
+            ]);
         } catch (\Exception $e) {
             abort(502, 'Segment fetch error: '.$e->getMessage());
         }
@@ -787,6 +976,7 @@ class AnimeController extends Controller
     {
         $pathDir = dirname($currentPath);
         $body = str_replace(["\r\n", "\r"], "\n", $body);
+        $encrypted = str_contains($body, '#EXT-X-KEY');
 
         $resolveRelative = function (string $uri) use ($pathDir, $baseUrl): string {
             if (str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
@@ -813,29 +1003,29 @@ class AnimeController extends Controller
 
         $body = preg_replace_callback(
             '/^(?!#)(\S+)/m',
-            function ($m) use ($proxySegmentUrl, $resolveRelative) {
+            function ($m) use ($proxySegmentUrl, $resolveRelative, $encrypted) {
                 $line = trim($m[1]);
                 if ($line === '') {
                     return $m[0];
                 }
 
-                return $this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($line));
+                return $this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($line), $encrypted);
             },
             $body
         );
 
         $body = preg_replace_callback(
             '/\bURI="([^"]+)"/i',
-            function ($m) use ($proxySegmentUrl, $resolveRelative) {
-                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1])).'"';
+            function ($m) use ($proxySegmentUrl, $resolveRelative, $encrypted) {
+                return 'URI="'.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1]), $encrypted).'"';
             },
             $body
         );
 
         $body = preg_replace_callback(
             '/\bURI=([^\s,"\']+)/i',
-            function ($m) use ($proxySegmentUrl, $resolveRelative) {
-                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1]));
+            function ($m) use ($proxySegmentUrl, $resolveRelative, $encrypted) {
+                return 'URI='.$this->proxiedSegmentUrl($proxySegmentUrl, $resolveRelative($m[1]), $encrypted);
             },
             $body
         );

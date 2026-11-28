@@ -1,7 +1,6 @@
 /vendor
 /node_modules
 /node_modules_old
-/consumet-server/node_modules
 /anivexa-server/node_modules
 /anivexa-server/.env
 /.env

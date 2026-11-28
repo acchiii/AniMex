@@ -1,5 +1,5 @@
-AniMex deployment steps (Vercel + Neon + separate Consumet server)
-==================================================================
+AniMex deployment steps (Vercel + Neon + separate Anivexa server)
+=================================================================
 
 0) Security first
 - The old .env was committed in Git history. Rotate these credentials now:
@@ -11,22 +11,9 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
 
 1) Local preparation
 - Copy .env.example to .env if needed.
-- Local .env must contain: CONSUMET_BASE_URL=http://127.0.0.1:3000
-  (Do NOT use http://localhost:8000/api. That is Laravel calling itself and
-  causes the 60-second timeout.)
-- Start the source scraper: cd consumet-server && npm install && npm start
+- Local .env must contain ANIVEXA_BASE_URL and ANIVEXA_PROVIDERS.
 - Start Laravel: php artisan serve
-- Check the scraper: http://127.0.0.1:3000/health
-
-2) Deploy the Consumet scraper as its own Vercel project
-- In Vercel, create a new project and select this repository.
-- Set Root Directory to: consumet-server
-- Vercel should detect Express automatically (server.js now exports the app
-  and only listens locally).
-- Set Function Max Duration to 60 seconds in Project Settings > Functions.
-- Deploy, then copy the deployment URL, for example:
-  https://animex-consumet.vercel.app
-- Verify: https://animex-consumet.vercel.app/health returns {"status":"ok"}.
+- For local Anivexa, see the Anivexa section below.
 
 3) Prepare Neon Postgres
 - Create a Neon database.
@@ -72,7 +59,6 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
   DB_USERNAME=<neon-user>
   DB_PASSWORD=<neon-password>
   DB_SSLMODE=require
-  CONSUMET_BASE_URL=https://<consumet-project>.vercel.app
   ANIPUB_BASE_URL=https://anipub.xyz
   OPENSUBTITLES_API_KEY=<key>
   JIMAKU_API_KEY=<key>
@@ -117,8 +103,8 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
   the provider/CDN directly where possible or move Laravel to a container.
 
 8) Deploy the Anivexa source provider on Vercel
-- Anivexa is the primary episode/source provider. Consumet, AniPub and AniList
-  remain fallbacks.
+- Anivexa is the primary episode/source provider. AniPub and AniList remain
+  fallbacks.
 - The source lives in the repository at: anivexa-server/
 - Create a separate Vercel project from this repository.
 - Root Directory: anivexa-server
@@ -140,10 +126,9 @@ AniMex deployment steps (Vercel + Neon + separate Consumet server)
   curl "https://<anivexa-project>.vercel.app/watch/kaa/11061/sub/kaa-1"
 - In the Laravel Vercel project set:
   ANIVEXA_BASE_URL=https://<anivexa-project>.vercel.app
-  ANIVEXA_PROVIDERS=anikoto,kaa,animegg
-- Keep anikoto first: it works from Vercel with a Referer header. KAA often
-  returns Cloudflare 403 on its segment hosts; AniHQ 403s from Vercel; Reanime
-  playlists are encrypted and Pahenime playlists are image-wrapped.
+  ANIVEXA_PROVIDERS=anihq,reanime,anikoto,animegg,animenosub,anizone,aniwaves,pahenime,kaa,animedunya,animeonsen,anipm
+- All providers are configured. Batch lookups and health gating temporarily skip
+  providers that time out or return 403, then retry them after cooldown.
 - After changing provider order, refresh stored sources from the machine that
   can reach the database:
   php artisan animex:refresh-episode-sources --anilist=176496 --episode=1

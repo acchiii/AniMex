@@ -254,13 +254,15 @@
 @endpush
 
 @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
     @php
         $sourcesData = $episode->sources->map(fn($s) => [
             'id' => $s->id,
             'url' => $s->url,
             'type' => $s->type ?? 'mp4',
             'headers' => $s->headers ?? [],
+            'provider' => $s->provider,
+            'metadata' => $s->metadata ?? [],
         ])->values()->all();
 
         $proxySubtitleUrl = route('proxy.subtitle');
@@ -284,7 +286,9 @@
         const subtitles = @json($subtitlesData);
         const sourcesPending = @json($sourcesPending);
         const sourcesEndpoint = @json(route('anime.sources', ['anime' => $anime->slug, 'episode' => $episode->id]));
+        const sourceFailureEndpoint = @json(route('anime.source.failed', ['source' => 0]));
         let sourcePolls = 0;
+        let switchingSource = false;
 
         function pollSources() {
             if (!sourcesPending || sourcePolls >= 12) return;
@@ -316,6 +320,8 @@
 
         let hls = null;
         let hlsUsingProxy = false;
+        let mp4UsingProxy = false;
+        let mp4TriedProxy = false;
         let currentSourceIndex = -1;
         const player = document.getElementById('video-player');
         const embedPlayer = document.getElementById('embed-player');
@@ -326,6 +332,47 @@
         let subtitleOffset = 0;
         let userSubChoice = false;
         let originalVttCache = {};
+
+        function reportSourceFailure() {
+            const src = sources[currentSourceIndex];
+            if (!src || src.failureReported) return;
+            src.failureReported = true;
+
+            const endpoint = sourceFailureEndpoint.replace('/0', '/' + src.id);
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                credentials: 'same-origin',
+                body: '{}'
+            }).catch(function () {});
+        }
+
+        function showPlayOverlay() {
+            playOverlay.classList.remove('hidden');
+        }
+
+        function switchToNextSource(reason) {
+            if (switchingSource) return;
+            switchingSource = true;
+            reportSourceFailure();
+            console.warn('Source failed, switching:', reason);
+            const nextIndex = currentSourceIndex + 1;
+
+            if (nextIndex >= sources.length) {
+                switchingSource = false;
+                showPlayOverlay();
+                return;
+            }
+
+            setTimeout(function () {
+                switchingSource = false;
+                changeSource(nextIndex);
+            }, 50);
+        }
 
         function playVideo() {
             playOverlay.classList.add('hidden');
@@ -342,6 +389,9 @@
             currentSourceIndex = index;
             if (hls) { hls.destroy(); hls = null; }
             hlsUsingProxy = false;
+            mp4UsingProxy = false;
+            mp4TriedProxy = false;
+            player.onerror = null;
 
             player.classList.add('hidden');
             embedPlayer.classList.add('hidden');
@@ -364,7 +414,12 @@
             const isHls = src.type === 'hls' || String(src.url).match(/\.m3u8/i);
 
             if (isHls && Hls.isSupported()) {
-                const needsProxy = Object.keys(src.headers || {}).length > 0;
+                const metadata = src.metadata || {};
+                const wrapperOffsets = metadata.wrapper_offsets || {};
+                const needsProxy = Object.keys(src.headers || {}).length > 0
+                    || !!metadata.playlist_key
+                    || !!metadata.wrapped_format
+                    || Object.keys(wrapperOffsets).length > 0;
                 hls = new Hls({
                     xhrSetup: function (xhr) {
                         if (hlsUsingProxy) return;
@@ -385,24 +440,24 @@
                     startLevel: 0,
                     manifestLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 30000,
-                            maxLoadTimeMs: 120000,
-                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+                            maxTimeToFirstByteMs: 20000,
+                            maxLoadTimeMs: 45000,
+                            timeoutRetry: { maxNumRetry: 1, retryDelayMs: 0, maxRetryDelayMs: 0 },
                             errorRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },
                     },
                     playlistLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 30000,
-                            maxLoadTimeMs: 180000,
-                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
+                            maxTimeToFirstByteMs: 20000,
+                            maxLoadTimeMs: 60000,
+                            timeoutRetry: { maxNumRetry: 1, retryDelayMs: 0, maxRetryDelayMs: 0 },
                             errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },
                     },
                     fragLoadPolicy: {
                         default: {
-                            maxTimeToFirstByteMs: 60000,
-                            maxLoadTimeMs: 240000,
+                            maxTimeToFirstByteMs: 30000,
+                            maxLoadTimeMs: 90000,
                             timeoutRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                             errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000 },
                         },
@@ -413,8 +468,9 @@
                 hls.attachMedia(player);
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     buildQualitySelector();
+                    rebuildTracks();
                     player.play().catch(function () {
-                        playOverlay.classList.remove('hidden');
+                        showPlayOverlay();
                     });
                 });
                 hls.on(Hls.Events.ERROR, function (event, data) {
@@ -428,31 +484,38 @@
                             return;
                         }
 
-                        const nextIndex = currentSourceIndex + 1;
-                        if (nextIndex < sources.length) {
-                            console.warn('HLS source failed, trying next source:', nextIndex);
-                            setTimeout(function () { changeSource(nextIndex); }, 50);
-                            return;
-                        }
-
-                        playOverlay.classList.remove('hidden');
+                        switchToNextSource(data.details || 'network');
                         return;
                     }
 
                     if (['bufferStalledError', 'bufferSeekOverHole', 'bufferAppendError', 'fragParsingError'].includes(data.details)) {
                         hls.startLoad();
+                        return;
                     }
+
+                    switchToNextSource(data.details || 'media');
                 });
                 return;
             }
 
             document.getElementById('quality-section')?.classList.add('hidden');
 
-            player.src = proxyUrl;
+            player.src = src.url;
             player.load();
-            player.play().catch(function () {
-                playOverlay.classList.remove('hidden');
-            });
+            rebuildTracks();
+            player.onerror = function () {
+                if (!mp4TriedProxy) {
+                    mp4TriedProxy = true;
+                    mp4UsingProxy = true;
+                    player.src = proxyUrl;
+                    player.load();
+                    player.play().catch(showPlayOverlay);
+                    return;
+                }
+
+                switchToNextSource('mp4');
+            };
+            player.play().catch(showPlayOverlay);
         }
 
         function setQuality(level) {

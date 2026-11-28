@@ -132,6 +132,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
 // API-like AJAX Routes
 Route::get('/anime/{anime}/episodes/{episode}/sources', [AnimeController::class, 'sources'])->name('anime.sources');
+Route::post('/anime/sources/{source}/failed', [AnimeController::class, 'sourceFailed'])->name('anime.source.failed');
 Route::post('/anime/{animeId}/rate', [AnimeController::class, 'rate'])->name('anime.rate');
 Route::post('/anime/{animeId}/favorite', [AnimeController::class, 'favorite'])->name('anime.favorite');
 Route::post('/anime/{animeId}/comment', [AnimeController::class, 'postComment'])->name('anime.comment');

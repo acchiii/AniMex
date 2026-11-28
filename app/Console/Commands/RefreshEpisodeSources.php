@@ -99,6 +99,7 @@ class RefreshEpisodeSources extends Command
                                     continue;
                                 }
 
+                                $metadata = is_array($source['metadata'] ?? null) ? $source['metadata'] : null;
                                 EpisodeSource::create([
                                     'episode_id' => $episode->id,
                                     'video_server_id' => null,
@@ -106,6 +107,9 @@ class RefreshEpisodeSources extends Command
                                     'quality' => in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true) ? $quality : '720p',
                                     'url' => $url,
                                     'headers' => $source['headers'] ?? null,
+                                    'metadata' => $metadata,
+                                    'provider' => (string) ($source['provider'] ?? ($metadata['provider'] ?? '')),
+                                    'expires_at' => now()->addSeconds(60),
                                     'type' => (string) ($source['type'] ?? 'mp4'),
                                     'language' => (string) ($source['language'] ?? 'sub'),
                                     'is_active' => (bool) ($source['is_active'] ?? true),

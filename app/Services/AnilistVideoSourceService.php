@@ -18,11 +18,7 @@ class AnilistVideoSourceService
 
     private const WATCH_TIMEOUT = 10;
 
-    private string $consumetBaseUrl;
-
     private string $anipubBaseUrl;
-
-    private array $infoCache = [];
 
     private ?float $deadline = null;
 
@@ -32,7 +28,6 @@ class AnilistVideoSourceService
 
     public function __construct()
     {
-        $this->consumetBaseUrl = rtrim((string) config('services.consumet.base_url', 'https://animex-consumet.vercel.app'), '/');
         $this->anipubBaseUrl = rtrim((string) config('services.anipub.base_url', 'https://anipub.xyz'), '/');
         $this->anivexa = app(AnivexaVideoSourceService::class);
     }
@@ -106,9 +101,7 @@ class AnilistVideoSourceService
             return $results;
         }
 
-        $discovery = $this->discover($anilistId, $animeTitle, true);
-        $info = $discovery['info'];
-        $anipubId = (int) $discovery['anipub_id'];
+        $anipubId = $this->resolveAnipubId($anilistId, $animeTitle);
 
         $anipubDetails = null;
         if ($anipubId > 0) {
@@ -119,39 +112,16 @@ class AnilistVideoSourceService
         }
 
         foreach (array_chunk($pending, 8) as $chunk) {
-            $requests = [];
             foreach ($chunk as $number) {
-                $watch = $this->buildWatchUrl($info, $number);
-                if ($watch['url']) {
-                    $requests[$number] = $watch['url'];
-                }
-            }
+                $result = ['sources' => [], 'subtitles' => [], 'error' => 'No sources found'];
 
-            $responses = [];
-            if (! empty($requests)) {
-                $timeout = max(1, $this->remainingTimeout(self::WATCH_TIMEOUT));
-                try {
-                    $responses = Http::withHeaders(['Accept' => 'application/json'])
-                        ->pool(function ($pool) use ($requests, $timeout) {
-                            foreach ($requests as $number => $url) {
-                                $pool->as((string) $number)->connectTimeout(3)->timeout($timeout)->get($url);
-                            }
-                        });
-                } catch (Throwable $e) {
-                    $this->safeLog('warning', 'AnilistVideoSource batch request failed', ['error' => $e->getMessage()]);
-                }
-            }
-
-            foreach ($chunk as $number) {
-                $response = $responses[$number] ?? $responses[(string) $number] ?? null;
-                $result = $response !== null
-                    ? $this->parseConsumetWatch($response)
-                    : ['sources' => [], 'subtitles' => [], 'error' => 'No watch response'];
-
-                if (empty($result['sources']) && $anipubDetails !== null) {
+                if ($anipubDetails !== null) {
                     $fallback = $this->parseAnipubDetails($anipubDetails, $number);
                     if (! empty($fallback['sources'])) {
+                        $fallback['provider'] = 'AniPub';
                         $result = $fallback;
+                    } elseif (! empty($fallback['error'])) {
+                        $result['error'] = $fallback['error'];
                     }
                 }
 
@@ -196,39 +166,17 @@ class AnilistVideoSourceService
                 }
             }
 
-            $info = $this->discover($anilistId, $animeTitle, false)['info'];
-            $episodes = Arr::get($info, 'episodes', []);
-
-            if (empty($episodes)) {
-                $fallback = $this->fetchAniListEpisodes($anilistId, $animeTitle);
-                if (! empty($fallback['episodes'])) {
-                    return $fallback;
-                }
-
-                $errors = [$this->lastError ?: 'Consumet server unreachable'];
-                if (! empty($anivexaError)) {
-                    $errors[] = 'Anivexa: '.$anivexaError;
-                }
-                if (! empty($fallback['error'])) {
-                    $errors[] = 'AniList: '.$fallback['error'];
-                }
-
-                return ['error' => implode(' | ', $errors)];
+            $fallback = $this->fetchAniListEpisodes($anilistId, $animeTitle);
+            if (! empty($fallback['episodes'])) {
+                return $fallback;
             }
 
-            $episodes = array_map(function (array $episode): array {
-                $number = (int) ($episode['number'] ?? 0);
-                $episode['title'] = EpisodeTitle::title($episode['title'] ?? null, $number);
+            $errors = [$fallback['error'] ?? 'No episode list providers available'];
+            if (! empty($anivexaError)) {
+                $errors[] = 'Anivexa: '.$anivexaError;
+            }
 
-                return $episode;
-            }, $episodes);
-
-            return [
-                'episodes' => $episodes,
-                'provider' => $info['_provider'] ?? null,
-                'totalEpisodes' => $info['totalEpisodes'] ?? count($episodes),
-                'title' => $info['title'] ?? null,
-            ];
+            return ['error' => implode(' | ', $errors)];
         } catch (Throwable $e) {
             return ['error' => 'Episode list lookup failed: '.$e->getMessage()];
         }
@@ -337,63 +285,20 @@ class AnilistVideoSourceService
             }
         }
 
-        $discovery = $this->discover($anilistId, $animeTitle, true);
-        $info = $discovery['info'];
-        $anipubId = (int) $discovery['anipub_id'];
+        $anipubId = $this->resolveAnipubId($anilistId, $animeTitle);
 
-        $watch = $this->buildWatchUrl($info, $episodeNumber);
-        $detailsUrl = $anipubId > 0 ? "{$this->anipubBaseUrl}/v1/api/details/{$anipubId}" : null;
-
-        $watchResponse = null;
         $detailsResponse = null;
-
-        if ($watch['url'] && $detailsUrl) {
+        if ($anipubId > 0) {
             $timeout = $this->remainingTimeout(self::WATCH_TIMEOUT);
             if ($timeout > 0) {
-                try {
-                    $responses = Http::withHeaders(['Accept' => 'application/json'])
-                        ->pool(function ($pool) use ($watch, $detailsUrl, $timeout) {
-                            $pool->as('watch')->connectTimeout(3)->timeout($timeout)->get($watch['url']);
-                            $pool->as('details')->connectTimeout(3)->timeout($timeout)->get($detailsUrl);
-                        });
-                    $watchResponse = $responses['watch'] ?? null;
-                    $detailsResponse = $responses['details'] ?? null;
-                } catch (Throwable $e) {
-                    $this->safeLog('warning', 'AnilistVideoSource parallel lookup failed', ['error' => $e->getMessage()]);
-                }
-            }
-        } elseif ($watch['url']) {
-            $timeout = $this->remainingTimeout(self::WATCH_TIMEOUT);
-            if ($timeout > 0) {
-                $watchResponse = $this->get($watch['url'], $timeout);
-            }
-        } elseif ($detailsUrl) {
-            $timeout = $this->remainingTimeout(self::WATCH_TIMEOUT);
-            if ($timeout > 0) {
-                $detailsResponse = $this->get($detailsUrl, $timeout);
+                $detailsResponse = $this->get("{$this->anipubBaseUrl}/v1/api/details/{$anipubId}", $timeout);
             }
         }
-
-        $consumetError = $watch['error'] ?? 'Consumet info unavailable';
-        if ($watchResponse !== null) {
-            $result = $this->parseConsumetWatch($watchResponse);
-            if (! empty($result['sources'])) {
-                $this->safeLog('info', 'AnilistVideoSource: Found sources via Consumet', [
-                    'anilist_id' => $anilistId, 'episode' => $episodeNumber,
-                ]);
-
-                return $result;
-            }
-            $consumetError = $result['error'] ?? $consumetError;
-        }
-
-        $this->safeLog('warning', 'AnilistVideoSource: Consumet failed', [
-            'anilist_id' => $anilistId, 'episode' => $episodeNumber, 'error' => $consumetError,
-        ]);
 
         if ($detailsResponse !== null) {
             $result = $this->parseAnipubDetails($detailsResponse, $episodeNumber);
             if (! empty($result['sources'])) {
+                $result['provider'] = 'AniPub';
                 $this->safeLog('info', 'AnilistVideoSource: Found sources via AniPub', [
                     'anilist_id' => $anilistId, 'episode' => $episodeNumber,
                 ]);
@@ -414,156 +319,49 @@ class AnilistVideoSourceService
         ];
     }
 
-    private function discover(int $anilistId, ?string $animeTitle, bool $includeAnipub): array
+    private function resolveAnipubId(int $anilistId, ?string $animeTitle): int
     {
-        $infoKey = 'sources:info:'.$anilistId.':'.md5((string) $animeTitle);
-        $info = $this->cachedInfo($infoKey, $anilistId);
+        if (! $animeTitle) {
+            return 0;
+        }
 
-        $anipubKey = ($includeAnipub && $animeTitle) ? 'sources:anipub:'.md5($animeTitle) : null;
-        $anipubId = $anipubKey ? (int) $this->cacheValue($anipubKey) : 0;
-
-        if ($info !== null && (! $anipubKey || $anipubId > 0)) {
-            return ['info' => $info, 'anipub_id' => $anipubId];
+        $key = 'sources:anipub:'.$anilistId.':'.md5($animeTitle);
+        $cached = (int) $this->cacheValue($key);
+        if ($cached > 0) {
+            return $cached;
         }
 
         $timeout = $this->remainingTimeout(self::DISCOVERY_TIMEOUT);
         if ($timeout <= 0) {
-            return ['info' => $info ?? [], 'anipub_id' => $anipubId];
+            return 0;
         }
 
-        $infoUrl = "{$this->consumetBaseUrl}/meta/anilist/info/{$anilistId}";
-        if ($animeTitle) {
-            $infoUrl .= '?title='.urlencode($animeTitle);
-        }
-        $findUrl = $anipubKey && $anipubId <= 0
-            ? "{$this->anipubBaseUrl}/api/find/".urlencode($animeTitle)
-            : null;
-        $searchUrl = $anipubKey && $anipubId <= 0
-            ? "{$this->anipubBaseUrl}/api/search/".urlencode($animeTitle)
-            : null;
+        $findUrl = "{$this->anipubBaseUrl}/api/find/".urlencode($animeTitle);
+        $searchUrl = "{$this->anipubBaseUrl}/api/search/".urlencode($animeTitle);
 
         try {
             $responses = Http::withHeaders(['Accept' => 'application/json'])
-                ->pool(function ($pool) use ($info, $infoUrl, $findUrl, $searchUrl, $timeout) {
-                    if ($info === null) {
-                        $pool->as('info')->connectTimeout(3)->timeout($timeout)->get($infoUrl);
-                    }
-                    if ($findUrl) {
-                        $pool->as('find')->connectTimeout(3)->timeout($timeout)->get($findUrl);
-                    }
-                    if ($searchUrl) {
-                        $pool->as('search')->connectTimeout(3)->timeout($timeout)->get($searchUrl);
-                    }
+                ->pool(function ($pool) use ($findUrl, $searchUrl, $timeout) {
+                    $pool->as('find')->connectTimeout(3)->timeout($timeout)->get($findUrl);
+                    $pool->as('search')->connectTimeout(3)->timeout($timeout)->get($searchUrl);
                 });
         } catch (Throwable $e) {
-            $this->safeLog('warning', 'AnilistVideoSource discovery failed', ['error' => $e->getMessage()]);
+            $this->lastError = $e->getMessage();
 
-            return ['info' => $info ?? [], 'anipub_id' => $anipubId];
+            return 0;
         }
 
-        if ($info === null) {
-            $infoResponse = $responses['info'] ?? null;
-            if ($this->isOk($infoResponse)) {
-                $data = $infoResponse->json();
-                if (is_array($data)) {
-                    $info = $data;
-                    $this->infoCache[$anilistId] = $data;
-                    $this->putCache($infoKey, $data, 3600);
-                }
-            } else {
-                $this->lastError = $this->responseError($infoResponse, 'Consumet server unreachable');
-            }
+        $id = $this->parseAnipubDiscovery(
+            $responses['find'] ?? null,
+            $responses['search'] ?? null,
+            $animeTitle
+        );
+
+        if ($id > 0) {
+            $this->putCache($key, $id, 86400);
         }
 
-        if ($anipubKey && $anipubId <= 0) {
-            $anipubId = $this->parseAnipubDiscovery(
-                $responses['find'] ?? null,
-                $responses['search'] ?? null,
-                (string) $animeTitle
-            );
-            if ($anipubId > 0) {
-                $this->putCache($anipubKey, $anipubId, 86400);
-            }
-        }
-
-        return ['info' => $info ?? [], 'anipub_id' => $anipubId];
-    }
-
-    private function buildWatchUrl(array $info, int $episodeNumber): array
-    {
-        $episodeId = null;
-        foreach (Arr::get($info, 'episodes', []) as $episode) {
-            if ((int) Arr::get($episode, 'number', 0) === $episodeNumber) {
-                $episodeId = Arr::get($episode, 'id');
-                break;
-            }
-        }
-
-        if (! $episodeId) {
-            return ['url' => null, 'error' => "Episode {$episodeNumber} not found in provider's list"];
-        }
-
-        $provider = Arr::get($info, '_provider');
-        $url = "{$this->consumetBaseUrl}/meta/anilist/watch/".urlencode((string) $episodeId);
-        if ($provider) {
-            $url .= '?provider='.urlencode((string) $provider);
-        }
-
-        return ['url' => $url, 'error' => null];
-    }
-
-    private function parseConsumetWatch(mixed $response): array
-    {
-        if (! $this->isOk($response)) {
-            return ['sources' => [], 'subtitles' => [], 'error' => 'Watch endpoint unavailable'];
-        }
-
-        $data = $response->json();
-        $headers = Arr::get($data, 'headers', []);
-
-        $sources = [];
-        foreach (Arr::get($data, 'sources', []) as $source) {
-            $url = (string) Arr::get($source, 'url', '');
-            if ($url === '') {
-                continue;
-            }
-
-            $quality = (string) Arr::get($source, 'quality', '720p');
-            $quality = is_numeric($quality) ? $quality.'p' : $quality;
-            if (! in_array($quality, ['360p', '480p', '720p', '1080p', '4K'], true)) {
-                $quality = '720p';
-            }
-
-            $sources[] = [
-                'label' => $quality,
-                'quality' => $quality,
-                'url' => $url,
-                'type' => (bool) Arr::get($source, 'isM3U8', false) ? 'hls' : 'mp4',
-                'language' => 'sub',
-                'is_active' => true,
-                'video_server_id' => null,
-                'headers' => $headers,
-            ];
-        }
-
-        $subtitles = [];
-        $langLabels = ['en' => 'English', 'ja' => '日本語'];
-        foreach (Arr::get($data, 'subtitles', []) as $subtitle) {
-            $url = (string) Arr::get($subtitle, 'url', '');
-            $lang = (string) Arr::get($subtitle, 'lang', 'en');
-            if ($url === '' || ! in_array($lang, ['en', 'ja'], true)) {
-                continue;
-            }
-
-            $subtitles[] = [
-                'language' => $lang,
-                'label' => $langLabels[$lang] ?? strtoupper($lang),
-                'file_path' => $url,
-                'is_default' => $lang === 'en',
-            ];
-        }
-
-        return ['sources' => $sources, 'subtitles' => $subtitles, 'headers' => $headers];
+        return $id;
     }
 
     private function parseAnipubDiscovery(mixed $find, mixed $search, string $title): int
@@ -645,26 +443,16 @@ class AnilistVideoSourceService
                 'is_active' => true,
                 'video_server_id' => null,
                 'headers' => [],
+                'provider' => 'AniPub',
+                'metadata' => [
+                    'provider' => 'AniPub',
+                    'format' => 'embed',
+                    'fetched_at' => time(),
+                ],
             ]],
             'subtitles' => [],
             'headers' => [],
         ];
-    }
-
-    private function cachedInfo(string $key, int $anilistId): ?array
-    {
-        if (isset($this->infoCache[$anilistId])) {
-            return $this->infoCache[$anilistId];
-        }
-
-        $cached = $this->cacheValue($key);
-        if (is_array($cached)) {
-            $this->infoCache[$anilistId] = $cached;
-
-            return $cached;
-        }
-
-        return null;
     }
 
     private function cacheValue(string $key): mixed

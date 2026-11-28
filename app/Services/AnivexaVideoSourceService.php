@@ -20,6 +20,13 @@ class AnivexaVideoSourceService
 
     private const WATCH_CACHE_SECONDS = 60;
 
+    private const PROVIDER_HEALTH_SECONDS = 900;
+
+    private const DEFAULT_PROVIDERS = [
+        'anihq', 'reanime', 'anikoto', 'animegg', 'animenosub', 'anizone',
+        'aniwaves', 'pahenime', 'kaa', 'animedunya', 'animeonsen', 'anipm',
+    ];
+
     private string $baseUrl;
 
     private array $providers;
@@ -40,7 +47,7 @@ class AnivexaVideoSourceService
             $providers
         )));
 
-        $this->providers = $providers ?: ['animegg', 'kaa'];
+        $this->providers = $providers ?: self::DEFAULT_PROVIDERS;
     }
 
     public function isEnabled(): bool
@@ -162,7 +169,7 @@ class AnivexaVideoSourceService
             $candidateLists = [];
 
             foreach ($chunk as $number) {
-                $candidateLists[$number] = array_slice($candidateMap[$number] ?? [], 0, 2);
+                $candidateLists[$number] = array_slice($candidateMap[$number] ?? [], 0, 3);
                 foreach ($candidateLists[$number] as $index => $candidate) {
                     $key = $number.':'.$index;
                     $requests[$key] = [
@@ -200,11 +207,13 @@ class AnivexaVideoSourceService
                     $response = $responses[$key] ?? null;
                     $result = $this->parseWatchResponse($response, (string) $candidate['provider']);
                     if (! empty($result['sources'])) {
+                        $this->markProviderSuccess((string) $candidate['provider']);
                         $results[$number] = array_merge($result, ['provider' => 'Anivexa/'.$candidate['provider']]);
 
                         continue 2;
                     }
 
+                    $this->markProviderFailure((string) $candidate['provider']);
                     $errors[] = $result['error'] ?? 'No sources';
                 }
 
@@ -277,78 +286,116 @@ class AnivexaVideoSourceService
 
     private function episodeIndex(int $anilistId): array
     {
-        $cacheKey = 'anivexa:episodes:'.md5($this->baseUrl.'|'.implode(',', $this->providers).'|'.$anilistId);
+        $providers = $this->activeProviders();
+        $cacheKey = 'anivexa:episodes:'.md5($this->baseUrl.'|'.implode(',', $providers).'|'.$anilistId);
         $cached = $this->cacheGet($cacheKey);
         if (is_array($cached)) {
             return $cached;
         }
 
-        $url = $this->baseUrl.'/episodes/'.implode('/', $this->providers).'/'.$anilistId.'?map=false';
-        $response = $this->get($url, self::EPISODE_TIMEOUT);
-        if (! $this->isOk($response)) {
-            $error = $this->responseError($response, 'Anivexa episode request failed');
-            $this->lastError = $error;
+        $chunks = array_values(array_chunk($providers, 3));
+        $responses = [];
 
-            return ['error' => $error];
+        try {
+            $responses = Http::withHeaders(['Accept' => 'application/json'])
+                ->pool(function ($pool) use ($chunks, $anilistId) {
+                    foreach ($chunks as $index => $group) {
+                        $url = $this->baseUrl.'/episodes/'.implode('/', $group).'/'.$anilistId.'?map=false';
+                        $pool->as((string) $index)->connectTimeout(3)->timeout(self::EPISODE_TIMEOUT)->get($url);
+                    }
+                });
+        } catch (Throwable $e) {
+            $this->lastError = $e->getMessage();
+            foreach ($providers as $provider) {
+                $this->markProviderFailure($provider);
+            }
         }
 
-        $data = $response->json();
-        if (! is_array($data)) {
-            $this->lastError = 'Anivexa returned an invalid episode response';
+        $result = ['mappings' => [], 'providers' => []];
+        $errors = [];
 
-            return ['error' => $this->lastError];
-        }
+        foreach ($chunks as $index => $group) {
+            $response = $responses[(string) $index] ?? null;
+            if (! $this->isOk($response)) {
+                $errors[] = $this->responseError($response, 'Anivexa episode request failed');
+                foreach ($group as $provider) {
+                    $this->markProviderFailure($provider);
+                }
 
-        $result = [
-            'mappings' => Arr::get($data, 'mappings', []),
-            'providers' => [],
-        ];
-
-        foreach ($this->providers as $provider) {
-            $block = Arr::get($data, $provider, []);
-            if (! is_array($block) || isset($block['error'])) {
                 continue;
             }
 
-            $lists = Arr::get($block, 'episodes', []);
-            if (! is_array($lists)) {
+            $data = $response->json();
+            if (! is_array($data)) {
+                $errors[] = 'Anivexa returned an invalid episode response';
+                foreach ($group as $provider) {
+                    $this->markProviderFailure($provider);
+                }
+
                 continue;
             }
 
-            $episodes = [];
-            $seen = [];
+            $mappings = Arr::get($data, 'mappings', []);
+            if (empty($result['mappings']) && is_array($mappings)) {
+                $result['mappings'] = $mappings;
+            }
 
-            foreach (['sub', 'dub'] as $audio) {
-                $list = Arr::get($lists, $audio, []);
-                if (! is_array($list)) {
+            foreach ($group as $provider) {
+                $block = Arr::get($data, $provider, []);
+                if (! is_array($block) || isset($block['error'])) {
+                    $errors[] = (string) (is_array($block) ? Arr::get($block, 'error') : null) ?: "{$provider}: unavailable";
+                    $this->markProviderFailure($provider);
+
                     continue;
                 }
 
-                foreach ($list as $episode) {
-                    if (! is_array($episode)) {
-                        continue;
-                    }
+                $lists = Arr::get($block, 'episodes', []);
+                if (! is_array($lists)) {
+                    $this->markProviderFailure($provider);
 
-                    $number = $this->episodeNumber($episode['number'] ?? null);
-                    if ($number <= 0 || isset($seen[$number])) {
-                        continue;
-                    }
-                    $seen[$number] = true;
-
-                    $path = (string) ($episode['id'] ?? "watch/{$provider}/{$anilistId}/{$audio}/{$provider}-{$number}");
-                    $episodes[] = [
-                        'number' => $number,
-                        'audio' => $audio,
-                        'path' => ltrim($path, '/'),
-                        'title' => $episode['title'] ?? null,
-                        'image' => $episode['image'] ?? null,
-                        'description' => $episode['description'] ?? null,
-                        'releaseDate' => $episode['airDate'] ?? null,
-                    ];
+                    continue;
                 }
-            }
 
-            if (! empty($episodes)) {
+                $episodes = [];
+                $seen = [];
+
+                foreach (['sub', 'dub'] as $audio) {
+                    $list = Arr::get($lists, $audio, []);
+                    if (! is_array($list)) {
+                        continue;
+                    }
+
+                    foreach ($list as $episode) {
+                        if (! is_array($episode)) {
+                            continue;
+                        }
+
+                        $number = $this->episodeNumber($episode['number'] ?? null);
+                        if ($number <= 0 || isset($seen[$number])) {
+                            continue;
+                        }
+                        $seen[$number] = true;
+
+                        $path = (string) ($episode['id'] ?? "watch/{$provider}/{$anilistId}/{$audio}/{$provider}-{$number}");
+                        $episodes[] = [
+                            'number' => $number,
+                            'audio' => $audio,
+                            'path' => ltrim($path, '/'),
+                            'title' => $episode['title'] ?? null,
+                            'image' => $episode['image'] ?? null,
+                            'description' => $episode['description'] ?? null,
+                            'releaseDate' => $episode['airDate'] ?? null,
+                        ];
+                    }
+                }
+
+                if (empty($episodes)) {
+                    $this->markProviderFailure($provider);
+
+                    continue;
+                }
+
+                $this->markProviderSuccess($provider);
                 $result['providers'][] = [
                     'provider' => $provider,
                     'meta' => Arr::get($block, 'meta', []),
@@ -358,7 +405,7 @@ class AnivexaVideoSourceService
         }
 
         if (empty($result['providers'])) {
-            $this->lastError = (string) (Arr::get($data, 'error') ?: 'Anivexa returned no episode lists');
+            $this->lastError = (string) (Arr::get($result, 'mappings.error') ?: implode(' | ', $errors) ?: 'Anivexa returned no episode lists');
 
             return ['error' => $this->lastError];
         }
@@ -414,6 +461,12 @@ class AnivexaVideoSourceService
         $cacheKey = 'anivexa:watch:'.md5($this->baseUrl.'|'.$path);
         $cached = $this->cacheGet($cacheKey);
         if (is_array($cached)) {
+            if (empty($cached['sources'])) {
+                $this->markProviderFailure($provider);
+            } else {
+                $this->markProviderSuccess($provider);
+            }
+
             return $cached;
         }
 
@@ -421,6 +474,12 @@ class AnivexaVideoSourceService
         $result = $this->parseWatchResponse($response, $provider);
         $seconds = empty($result['sources']) ? 15 : self::WATCH_CACHE_SECONDS;
         $this->cachePut($cacheKey, $result, $seconds);
+
+        if (empty($result['sources'])) {
+            $this->markProviderFailure($provider);
+        } else {
+            $this->markProviderSuccess($provider);
+        }
 
         return $result;
     }
@@ -517,13 +576,28 @@ class AnivexaVideoSourceService
                 $streamHeaders = array_merge($streamHeaders, $extraHeaders);
             }
 
-            $referer = Arr::get($stream, 'referer') ?: Arr::get($data, 'referer');
+            $providerReferers = [
+                'reanime' => 'https://flixcloud.cc/',
+                'pahenime' => 'https://pahe.in/',
+                'anikoto' => 'https://anikoto.to/',
+            ];
+            $referer = Arr::get($stream, 'referer')
+                ?: Arr::get($data, 'referer')
+                ?: ($providerReferers[$provider] ?? null);
             if ($referer && ! isset($streamHeaders['Referer']) && ! isset($streamHeaders['referer'])) {
                 $streamHeaders['Referer'] = (string) $referer;
             }
 
             $quality = $this->quality((string) (Arr::get($stream, 'quality') ?: ''));
             $label = (string) (Arr::get($stream, 'server') ?: Arr::get($stream, 'name') ?: $provider);
+            $playlistKey = Arr::get($stream, 'playlist_key')
+                ?: Arr::get($stream, 'playlistKey')
+                ?: Arr::get($stream, 'key')
+                ?: Arr::get($data, 'playlist_key')
+                ?: Arr::get($data, 'playlistKey')
+                ?: Arr::get($data, 'key');
+            $wrappedFormat = Arr::get($stream, 'wrappedFormat') ?: Arr::get($data, 'wrappedFormat');
+            $wrapperOffsets = Arr::get($stream, 'wrapperOffsets') ?: Arr::get($data, 'wrapperOffsets');
 
             $sources[] = [
                 'label' => $label !== '' ? $label : $provider,
@@ -534,6 +608,17 @@ class AnivexaVideoSourceService
                 'is_active' => true,
                 'video_server_id' => null,
                 'headers' => $streamHeaders,
+                'provider' => $provider,
+                'metadata' => array_filter([
+                    'provider' => $provider,
+                    'server' => (string) (Arr::get($stream, 'server') ?: Arr::get($data, 'server') ?: ''),
+                    'referer' => (string) ($referer ?: ''),
+                    'format' => $type,
+                    'playlist_key' => $playlistKey,
+                    'wrapped_format' => $wrappedFormat,
+                    'wrapper_offsets' => is_array($wrapperOffsets) ? $wrapperOffsets : null,
+                    'fetched_at' => time(),
+                ], fn ($value) => $value !== null && $value !== ''),
             ];
 
             foreach ((array) Arr::get($stream, 'subtitles', []) as $subtitle) {
@@ -650,6 +735,46 @@ class AnivexaVideoSourceService
     private function isOk(mixed $response): bool
     {
         return $response instanceof Response && $response->ok();
+    }
+
+    private function activeProviders(): array
+    {
+        $active = [];
+
+        foreach ($this->providers as $provider) {
+            $health = $this->cacheGet('anivexa:health:'.$provider);
+            $failures = is_array($health) ? (int) ($health['failures'] ?? 0) : 0;
+            $until = is_array($health) ? (int) ($health['until'] ?? 0) : 0;
+
+            if ($failures >= 2 && $until > time()) {
+                continue;
+            }
+
+            $active[] = $provider;
+        }
+
+        return $active ?: $this->providers;
+    }
+
+    private function markProviderFailure(string $provider): void
+    {
+        $key = 'anivexa:health:'.$provider;
+        $health = $this->cacheGet($key);
+        $failures = is_array($health) ? (int) ($health['failures'] ?? 0) : 0;
+        $failures++;
+
+        $this->cachePut($key, [
+            'failures' => min($failures, 3),
+            'until' => $failures >= 2 ? time() + self::PROVIDER_HEALTH_SECONDS : 0,
+        ], self::PROVIDER_HEALTH_SECONDS);
+    }
+
+    private function markProviderSuccess(string $provider): void
+    {
+        $this->cachePut('anivexa:health:'.$provider, [
+            'failures' => 0,
+            'until' => 0,
+        ], self::PROVIDER_HEALTH_SECONDS);
     }
 
     private function cacheGet(string $key): mixed
